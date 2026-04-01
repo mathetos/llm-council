@@ -491,7 +491,13 @@ def _merge_council_models_with_role_override(
     profile: Optional[Dict[str, Any]],
     role_assignments_override: Optional[Dict[str, str]],
 ) -> List[str]:
-    """Expand council models to include all override models in role-card order."""
+    """
+    Resolve council models from role overrides in role-card order.
+
+    When explicit role assignments are provided, treat them as the intended run set
+    instead of appending base pairing models. Appending can unintentionally balloon
+    Stage 2 reviewer count and latency (e.g., 4 role models + 3 base models = 7).
+    """
     if not role_assignments_override:
         return base_models
     role_cards = (profile or {}).get("perspective_roles") or []
@@ -505,11 +511,7 @@ def _merge_council_models_with_role_override(
     if not ordered_override_models:
         return base_models
 
-    merged = list(ordered_override_models)
-    for model in base_models:
-        if model not in merged:
-            merged.append(model)
-    return merged
+    return ordered_override_models
 
 
 async def _probe_zdr_compatibility(model_id: str, timeout: float = 12.0) -> Tuple[bool, Optional[str]]:
