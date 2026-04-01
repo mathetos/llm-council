@@ -14,6 +14,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [councilTransitionMessage, setCouncilTransitionMessage] = useState(null);
   const [interrogationState, setInterrogationState] = useState(null);
   const [profiles, setProfiles] = useState([]);
   const [selectedProfileId, setSelectedProfileId] = useState('');
@@ -647,12 +648,25 @@ function App() {
         answer
       );
 
+      if (response.awaiting_confirmation) {
+        setInterrogationState((prev) => ({
+          ...prev,
+          isSubmitting: false,
+          awaitingConfirmation: true,
+          confirmationSummary: response.confirmation_summary,
+          coverage: response.coverage,
+          question: null,
+        }));
+        return;
+      }
+
       if (!response.done) {
         setInterrogationState((prev) => ({
           ...prev,
           isSubmitting: false,
           question: response.question,
           questionNumber: response.question_number,
+          coverage: response.coverage,
         }));
         return;
       }
@@ -660,9 +674,57 @@ function App() {
       const originalContent = interrogationState.originalContent;
       const interrogationPayload = response.interrogation;
       setInterrogationState(null);
+      const coverageRatio = (response.interrogation?.coverage?.coverage_ratio ?? 0);
+      const msg = coverageRatio >= 0.8
+        ? 'Great! I have all the information I need for the Council. Pinging them now.'
+        : 'Proceeding to Council with the context gathered so far.';
+      setCouncilTransitionMessage(msg);
+      await new Promise((r) => setTimeout(r, 1500));
+      setCouncilTransitionMessage(null);
       await runCouncilMessage(originalContent, interrogationPayload);
     } catch (error) {
       console.error('Failed during interrogation:', error);
+      setCouncilTransitionMessage(null);
+      setInterrogationState((prev) =>
+        prev ? { ...prev, isSubmitting: false } : prev
+      );
+    }
+  };
+
+  const handleConfirmInterrogation = async (confirmed) => {
+    if (!interrogationState?.isOpen || !currentConversationId) return;
+
+    setInterrogationState((prev) => ({ ...prev, isSubmitting: true }));
+    try {
+      const response = await api.confirmInterrogation(
+        currentConversationId,
+        interrogationState.sessionId,
+        confirmed
+      );
+
+      if (!response.done) {
+        setInterrogationState((prev) => ({
+          ...prev,
+          isSubmitting: false,
+          awaitingConfirmation: false,
+          confirmationSummary: null,
+          question: response.question,
+          questionNumber: response.question_number,
+          coverage: response.coverage,
+        }));
+        return;
+      }
+
+      const originalContent = interrogationState.originalContent;
+      const interrogationPayload = response.interrogation;
+      setInterrogationState(null);
+      setCouncilTransitionMessage('Proceeding to Council with the context gathered so far.');
+      await new Promise((r) => setTimeout(r, 1500));
+      setCouncilTransitionMessage(null);
+      await runCouncilMessage(originalContent, interrogationPayload);
+    } catch (error) {
+      console.error('Failed during interrogation confirmation:', error);
+      setCouncilTransitionMessage(null);
       setInterrogationState((prev) =>
         prev ? { ...prev, isSubmitting: false } : prev
       );
@@ -765,9 +827,11 @@ function App() {
         onSendMessage={handleSendMessage}
         onStopCouncil={handleStopCouncil}
         isLoading={isLoading}
+        councilTransitionMessage={councilTransitionMessage}
         onSaveVerdictAsMarkdown={handleSaveVerdictAsMarkdown}
         interrogationState={interrogationState}
         onSubmitInterrogationAnswer={handleSubmitInterrogationAnswer}
+        onConfirmInterrogation={handleConfirmInterrogation}
         onDeferInterrogation={handleDeferInterrogation}
         onCancelInterrogation={handleCancelInterrogation}
         selectedProfileId={selectedProfileId}

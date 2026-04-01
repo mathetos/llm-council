@@ -32,6 +32,7 @@ from .council import (
     generate_interrogator_question,
     should_continue_interrogation,
     summarize_interrogation,
+    assess_interrogation_coverage,
     is_defer_answer,
     resolve_perspective_roles,
 )
@@ -668,6 +669,12 @@ class AnswerInterrogationRequest(BaseModel):
     answer: str
 
 
+class ConfirmInterrogationRequest(BaseModel):
+    """Request to confirm or reject the interrogation summary and proceed."""
+    session_id: str
+    confirmed: bool
+
+
 class TestPairingRequest(BaseModel):
     """Request to probe all models in a selected pairing."""
     model_pairing_id: Optional[str] = None
@@ -1195,11 +1202,43 @@ async def start_interrogation(conversation_id: str, request: StartInterrogationR
     }
 
 
+def _build_interrogation_payload(session: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the completed interrogation payload from session state."""
+    steps = session["steps"]
+    return {
+        "model": session["model"],
+        "profile_id": session["profile_id"],
+        "profile_name": session.get("profile_name"),
+        "packet_id": session.get("packet_id"),
+        "packet_title": session.get("packet_title"),
+        "packet_as_of": session.get("packet_as_of"),
+        "min_questions": session["min_questions"],
+        "max_questions": session["max_questions"],
+        "questions_asked": len(steps),
+        "steps": steps,
+        "summary": session.get("summary", ""),
+        "coverage": session.get("coverage"),
+        "completed": True,
+        "run_context": {
+            "model_pairing_id": session.get("model_pairing_id"),
+            "model_resolution": session.get("model_resolution"),
+            "profile_id": session["profile_id"],
+            "profile": get_profile(session["profile_id"]),
+            "packet_id": session.get("packet_id"),
+            "packet_title": session.get("packet_title"),
+            "packet_as_of": session.get("packet_as_of"),
+            "research_packet": session.get("research_packet"),
+            "role_assignments": [],
+        },
+    }
+
+
 @app.post("/api/conversations/{conversation_id}/interrogation/answer")
 async def answer_interrogation(conversation_id: str, request: AnswerInterrogationRequest):
     """
     Submit an answer for the active interrogation session and receive either:
-    - the next question, or
+    - the next question (with coverage assessment),
+    - a confirmation summary for high-uncertainty runs, or
     - a completed interrogation transcript payload.
     """
     session = INTERROGATION_SESSIONS.get(request.session_id)
@@ -1221,37 +1260,40 @@ async def answer_interrogation(conversation_id: str, request: AnswerInterrogatio
     steps[-1]["answer"] = normalized_answer
     steps[-1]["deferred"] = deferred
 
-    should_continue, continue_err = await should_continue_interrogation(
+    profile = get_profile(session["profile_id"])
+    required_fields = profile.get("required_context_fields", [])
+
+    assessment = await assess_interrogation_coverage(
         session["content"],
         steps,
+        required_fields,
         min_questions=session["min_questions"],
         max_questions=session["max_questions"],
         interrogator_model=session["model"],
     )
 
-    if should_continue:
-        next_question, question_err = await generate_interrogator_question(
-            session["content"],
-            steps,
-            run_context={
-                "profile": get_profile(session["profile_id"]),
-                "research_packet": session.get("research_packet"),
-            },
-            min_questions=session["min_questions"],
-            max_questions=session["max_questions"],
-            interrogator_model=session["model"],
-        )
+    session["coverage"] = assessment.get("coverage")
+    decision = assessment.get("decision", "stop_sufficient")
+
+    if decision == "ask_next":
+        next_question = assessment.get("next_question") or ""
         if not next_question:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to generate next question: {question_err or 'unknown error'}",
+            next_question_fallback, _ = await generate_interrogator_question(
+                session["content"],
+                steps,
+                run_context={"profile": profile, "research_packet": session.get("research_packet")},
+                min_questions=session["min_questions"],
+                max_questions=session["max_questions"],
+                interrogator_model=session["model"],
             )
+            next_question = next_question_fallback or "What is the most important constraint we should respect?"
         steps.append({"question": next_question, "answer": None, "deferred": False})
         return {
             "done": False,
             "question_number": len(steps),
             "question": next_question,
-            "note": continue_err,
+            "coverage": assessment.get("coverage"),
+            "note": assessment.get("error"),
         }
 
     summary = await summarize_interrogation(
@@ -1259,34 +1301,70 @@ async def answer_interrogation(conversation_id: str, request: AnswerInterrogatio
         steps,
         interrogator_model=session["model"],
     )
-    interrogation = {
-        "model": session["model"],
-        "profile_id": session["profile_id"],
-        "profile_name": session.get("profile_name"),
-        "packet_id": session.get("packet_id"),
-        "packet_title": session.get("packet_title"),
-        "packet_as_of": session.get("packet_as_of"),
-        "min_questions": session["min_questions"],
-        "max_questions": session["max_questions"],
-        "questions_asked": len(steps),
-        "steps": steps,
-        "summary": summary,
-        "completed": True,
-        "run_context": {
-            "model_pairing_id": session.get("model_pairing_id"),
-            "model_resolution": session.get("model_resolution"),
-            "profile_id": session["profile_id"],
-            "profile": get_profile(session["profile_id"]),
-            "packet_id": session.get("packet_id"),
-            "packet_title": session.get("packet_title"),
-            "packet_as_of": session.get("packet_as_of"),
-            "research_packet": session.get("research_packet"),
-            "role_assignments": [],
-        },
-    }
+    session["summary"] = summary
 
+    if decision == "confirm_needed":
+        confirmation_summary = assessment.get("confirmation_summary") or summary
+        session["awaiting_confirmation"] = True
+        session["confirmation_summary"] = confirmation_summary
+        return {
+            "done": False,
+            "awaiting_confirmation": True,
+            "confirmation_summary": confirmation_summary,
+            "coverage": assessment.get("coverage"),
+        }
+
+    interrogation = _build_interrogation_payload(session)
     INTERROGATION_SESSIONS.pop(request.session_id, None)
     return {"done": True, "interrogation": interrogation}
+
+
+@app.post("/api/conversations/{conversation_id}/interrogation/confirm")
+async def confirm_interrogation(conversation_id: str, request: ConfirmInterrogationRequest):
+    """
+    Confirm or reject the interrogation summary.
+    If confirmed, returns the completed interrogation payload.
+    If rejected, returns the user to questioning with one more attempt.
+    """
+    session = INTERROGATION_SESSIONS.get(request.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Interrogation session not found")
+    if session["conversation_id"] != conversation_id:
+        raise HTTPException(status_code=400, detail="Session does not belong to this conversation")
+    if not session.get("awaiting_confirmation"):
+        raise HTTPException(status_code=400, detail="Session is not awaiting confirmation")
+
+    session["awaiting_confirmation"] = False
+
+    if request.confirmed:
+        interrogation = _build_interrogation_payload(session)
+        INTERROGATION_SESSIONS.pop(request.session_id, None)
+        return {"done": True, "interrogation": interrogation}
+
+    profile = get_profile(session["profile_id"])
+    steps = session["steps"]
+    next_question, err = await generate_interrogator_question(
+        session["content"],
+        steps,
+        run_context={"profile": profile, "research_packet": session.get("research_packet")},
+        min_questions=session["min_questions"],
+        max_questions=session["max_questions"] + 1,
+        interrogator_model=session["model"],
+    )
+    if not next_question:
+        interrogation = _build_interrogation_payload(session)
+        INTERROGATION_SESSIONS.pop(request.session_id, None)
+        return {"done": True, "interrogation": interrogation}
+
+    session["max_questions"] = session["max_questions"] + 1
+    steps.append({"question": next_question, "answer": None, "deferred": False})
+    return {
+        "done": False,
+        "question_number": len(steps),
+        "question": next_question,
+        "coverage": session.get("coverage"),
+        "note": "Additional question after confirmation rejection",
+    }
 
 
 @app.post("/api/conversations/{conversation_id}/message")

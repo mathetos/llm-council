@@ -14,6 +14,7 @@ from .config import (
     INTERROGATOR_MODEL,
     INTERROGATOR_MIN_QUESTIONS,
     INTERROGATOR_MAX_QUESTIONS,
+    INTERROGATOR_COVERAGE_SUFFICIENT,
     get_profile,
 )
 
@@ -174,11 +175,189 @@ Transcript:
         timeout=45.0,
     )
     if response is None:
-        # Conservative default after minimum is reached: stop instead of over-questioning.
         return False, err
 
     decision = (response.get("content") or "").strip().upper()
     return decision.startswith("ASK_NEXT"), None
+
+
+def _parse_coverage_assessment(raw_text: str, required_fields: List[str]) -> Dict[str, Any]:
+    """Parse structured coverage assessment from LLM output."""
+    text = (raw_text or "").strip()
+    field_status: Dict[str, str] = {}
+    for field in required_fields:
+        field_lower = field.lower()
+        field_status[field] = "unknown"
+        for line in text.splitlines():
+            line_lower = line.lower().strip()
+            if field_lower in line_lower:
+                if "covered" in line_lower or "✅" in line_lower:
+                    field_status[field] = "covered"
+                elif "partial" in line_lower or "⚠" in line_lower:
+                    field_status[field] = "partial"
+                elif "missing" in line_lower or "❌" in line_lower or "unresolved" in line_lower:
+                    field_status[field] = "missing"
+                break
+
+    covered = sum(1 for s in field_status.values() if s == "covered")
+    partial = sum(1 for s in field_status.values() if s == "partial")
+    total = len(required_fields) if required_fields else 1
+    coverage_ratio = (covered + partial * 0.5) / total if total > 0 else 1.0
+
+    return {
+        "fields": field_status,
+        "covered_count": covered,
+        "partial_count": partial,
+        "missing_count": total - covered - partial,
+        "total_fields": total,
+        "coverage_ratio": round(coverage_ratio, 3),
+    }
+
+
+async def assess_interrogation_coverage(
+    user_query: str,
+    steps: List[Dict[str, Any]],
+    required_fields: List[str],
+    *,
+    min_questions: int = INTERROGATOR_MIN_QUESTIONS,
+    max_questions: int = INTERROGATOR_MAX_QUESTIONS,
+    interrogator_model: str = INTERROGATOR_MODEL,
+    coverage_sufficient: float = INTERROGATOR_COVERAGE_SUFFICIENT,
+) -> Dict[str, Any]:
+    """
+    Assess coverage of required context fields and decide next action.
+
+    Returns dict with:
+        - coverage: field-level status and ratio
+        - decision: "ask_next" | "stop_sufficient" | "stop_max_reached" | "confirm_needed"
+        - next_question: str or None (when decision is ask_next)
+        - confirmation_summary: str or None (when decision is confirm_needed)
+        - error: str or None
+    """
+    asked = len(steps)
+    transcript = _interrogation_steps_text(steps) or "(no answers yet)"
+    fields_text = ", ".join(required_fields) if required_fields else "(none)"
+
+    prompt = f"""You are the Interrogator for an LLM Council.
+Evaluate how well the user's query and answers so far cover the required context fields.
+
+Required context fields: {fields_text}
+
+For each field, output exactly one line in this format:
+- field_name: COVERED | PARTIAL | MISSING
+
+Then on a new line, output DECISION: followed by one of:
+- ASK_NEXT (if important fields are still missing and more questions would help)
+- STOP (if coverage is sufficient for a high-quality council run)
+
+If DECISION is ASK_NEXT, output on the next line:
+NEXT_QUESTION: <your single clarifying question targeting the biggest gap>
+
+If DECISION is STOP, output on the next line:
+SUMMARY: <2-3 sentence summary of what the user is asking, noting any remaining gaps>
+
+Question count: {asked}. Min: {min_questions}. Max: {max_questions}.
+
+Original query:
+{user_query}
+
+Transcript:
+{transcript}
+"""
+
+    response, err = await query_model_with_error(
+        interrogator_model,
+        [{"role": "user", "content": prompt}],
+        timeout=60.0,
+    )
+
+    if response is None:
+        fallback_coverage = _parse_coverage_assessment("", required_fields)
+        if asked < min_questions:
+            return {
+                "coverage": fallback_coverage,
+                "decision": "ask_next",
+                "next_question": None,
+                "confirmation_summary": None,
+                "error": err,
+            }
+        return {
+            "coverage": fallback_coverage,
+            "decision": "stop_sufficient",
+            "next_question": None,
+            "confirmation_summary": None,
+            "error": err,
+        }
+
+    raw = (response.get("content") or "").strip()
+    coverage = _parse_coverage_assessment(raw, required_fields)
+
+    if asked < min_questions:
+        question = _extract_field_from_response(raw, "NEXT_QUESTION")
+        return {
+            "coverage": coverage,
+            "decision": "ask_next",
+            "next_question": question,
+            "confirmation_summary": None,
+            "error": None,
+        }
+
+    if asked >= max_questions:
+        summary = _extract_field_from_response(raw, "SUMMARY")
+        if coverage["coverage_ratio"] >= coverage_sufficient:
+            return {
+                "coverage": coverage,
+                "decision": "stop_sufficient",
+                "next_question": None,
+                "confirmation_summary": None,
+                "error": None,
+            }
+        return {
+            "coverage": coverage,
+            "decision": "confirm_needed",
+            "next_question": None,
+            "confirmation_summary": summary,
+            "error": None,
+        }
+
+    decision_text = _extract_field_from_response(raw, "DECISION").upper()
+    if decision_text.startswith("ASK_NEXT"):
+        question = _extract_field_from_response(raw, "NEXT_QUESTION")
+        return {
+            "coverage": coverage,
+            "decision": "ask_next",
+            "next_question": question,
+            "confirmation_summary": None,
+            "error": None,
+        }
+
+    summary = _extract_field_from_response(raw, "SUMMARY")
+    if coverage["coverage_ratio"] >= coverage_sufficient:
+        return {
+            "coverage": coverage,
+            "decision": "stop_sufficient",
+            "next_question": None,
+            "confirmation_summary": None,
+            "error": None,
+        }
+
+    return {
+        "coverage": coverage,
+        "decision": "confirm_needed",
+        "next_question": None,
+        "confirmation_summary": summary or None,
+        "error": None,
+    }
+
+
+def _extract_field_from_response(text: str, field_name: str) -> str:
+    """Extract a named field value from structured LLM output."""
+    prefix = f"{field_name}:"
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith(prefix.upper()):
+            return stripped[len(prefix):].strip()
+    return ""
 
 
 async def summarize_interrogation(
@@ -232,6 +411,19 @@ def format_interrogation_context(interrogation: Optional[Dict[str, Any]]) -> str
         sections.append("Interrogator Summary:\n" + summary)
     if transcript:
         sections.append("Interrogation Transcript:\n" + transcript)
+
+    coverage = interrogation.get("coverage")
+    if isinstance(coverage, dict) and coverage.get("fields"):
+        gaps = [
+            field for field, status in coverage["fields"].items()
+            if status in ("missing", "partial")
+        ]
+        if gaps:
+            sections.append(
+                "Unresolved Context Gaps (state your assumptions explicitly for these):\n"
+                + "\n".join(f"- {field}" for field in gaps)
+            )
+
     return "\n\n".join(sections).strip()
 
 

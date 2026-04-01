@@ -16,6 +16,7 @@ LLM Council is a deliberation system where multiple LLMs collaboratively answer 
 - `CHAIRMAN_MODEL` — model for Stage 3 synthesis (defaults to a slug shared with title generation so a bad preview id does not silently break only Stage 3)
 - `INTERROGATOR_MODEL` — Stage 0 model for adaptive clarification (defaults to `CHAIRMAN_MODEL` when unset)
 - `INTERROGATOR_MIN_QUESTIONS` / `INTERROGATOR_MAX_QUESTIONS` — bounded Stage 0 question count (defaults: 2 / 5, validated in config)
+- `INTERROGATOR_COVERAGE_SUFFICIENT` — fraction of required context fields that must be covered to skip the confirmation summary (default: 0.8)
 - `COUNCIL_PROFILES` — profile guardrail contracts (marketing / product_development / business_development)
 - `DEFAULT_PROFILE_ID` — default profile resolved by API and UI selector
 - `GUARDRAIL_ENFORCEMENT_MODE` — guardrail gate behavior (`off`, `degraded`, `strict_fail`)
@@ -60,7 +61,8 @@ LLM Council is a deliberation system where multiple LLMs collaboratively answer 
   - `GET /api/profiles/{profile_id}/packets`
 - Stage 0 endpoints:
   - `POST /api/conversations/{id}/interrogation/start`
-  - `POST /api/conversations/{id}/interrogation/answer`
+  - `POST /api/conversations/{id}/interrogation/answer` — returns coverage assessment; may return `awaiting_confirmation` when coverage is low
+  - `POST /api/conversations/{id}/interrogation/confirm` — confirm or reject summary for low-coverage runs
 - First message gating: `/message` and `/message/stream` require completed interrogation payload for the first turn
 - Sync and stream routes resolve run-context via shared `_resolve_message_context()` and both execute the same council orchestration logic
 - POST `/api/conversations/{id}/message` returns metadata with stages
@@ -106,7 +108,10 @@ Enables reliable parsing while keeping useful evaluations.
 - Runs only on the first message in a conversation
 - Asks one question at a time, adaptively, within min/max bounds from config
 - Users can answer or defer specific aspects to the council
-- Transcript + summary are injected into Stage 1 prompt context and persisted with the assistant message
+- **Coverage assessment**: after each answer, the interrogator evaluates which `required_context_fields` are covered, partial, or missing. This drives the stop condition and question prioritization
+- **Coverage-driven stop**: interrogation stops early when coverage is sufficient (configurable via `INTERROGATOR_COVERAGE_SUFFICIENT`), continues when gaps remain
+- **Confirmation summary**: when interrogation ends with low coverage, the user sees a summary with identified gaps and can choose to proceed or provide more context
+- Transcript, summary, and coverage assessment are injected into Stage 1 prompt context (including gap callouts) and persisted with the assistant message
 - Uses selected profile + research packet to prioritize clarification questions
 
 ### Profile guardrails and packets
@@ -177,13 +182,16 @@ There is no committed `test_openrouter.py` in this fork. To sanity-check OpenRou
 
 ```
 User Query
-    → Stage 0 (first message only): Interrogator Q/A loop (2..5 by default)
-    → Stage 1: parallel queries → individual responses (with Stage 0 context when present)
-    → Stage 2: anonymize → parallel rankings → evaluations + parsed rankings
-    → Aggregate rankings → sort by average position
-    → Stage 3: chairman synthesis
-    → Return { stage1, stage2, stage3, metadata }
-    → Frontend: tabs + validation UI
+ → Stage 0 (first message only):
+   → Interrogator Q/A loop (2..5 by default) with coverage assessment per answer
+   → Coverage-driven stop (early if sufficient, confirmation summary if gaps remain)
+   → Optional confirmation step for low-coverage runs
+ → Stage 1: parallel queries → individual responses (with Stage 0 context + gap callouts)
+ → Stage 2: anonymize → parallel rankings → evaluations + parsed rankings
+ → Aggregate rankings → sort by average position
+ → Stage 3: chairman synthesis
+ → Return { stage1, stage2, stage3, metadata }
+ → Frontend: tabs + validation UI
 ```
 
 Use async/parallel paths wherever possible to reduce latency.
