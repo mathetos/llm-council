@@ -74,9 +74,11 @@ export default function ChatInterface({
   onSendMessage,
   onStopCouncil,
   isLoading,
+  councilTransitionMessage,
   onSaveVerdictAsMarkdown,
   interrogationState,
   onSubmitInterrogationAnswer,
+  onConfirmInterrogation,
   onDeferInterrogation,
   onCancelInterrogation,
   selectedProfileId,
@@ -334,14 +336,18 @@ export default function ChatInterface({
       </Modal>
 
       <InterrogatorModal
-        key={`${interrogationState?.sessionId || 'none'}-${interrogationState?.questionNumber || 0}`}
+        key={`${interrogationState?.sessionId || 'none'}-${interrogationState?.questionNumber || 0}-${interrogationState?.awaitingConfirmation ? 'confirm' : 'q'}`}
         isOpen={Boolean(interrogationState?.isOpen)}
         question={interrogationState?.question || ''}
         questionNumber={interrogationState?.questionNumber || 1}
         minQuestions={interrogationState?.minQuestions || 2}
         maxQuestions={interrogationState?.maxQuestions || 5}
         isSubmitting={Boolean(interrogationState?.isSubmitting)}
+        awaitingConfirmation={Boolean(interrogationState?.awaitingConfirmation)}
+        confirmationSummary={interrogationState?.confirmationSummary || ''}
+        coverage={interrogationState?.coverage || null}
         onSubmitAnswer={onSubmitInterrogationAnswer}
+        onConfirm={onConfirmInterrogation}
         onDefer={onDeferInterrogation}
         onCancel={onCancelInterrogation}
       />
@@ -433,6 +439,13 @@ export default function ChatInterface({
               )}
             </div>
           ))
+        )}
+
+        {councilTransitionMessage && !isLoading && (
+          <div className="flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+            <span>✓</span>
+            <span>{councilTransitionMessage}</span>
+          </div>
         )}
 
         {isLoading && (

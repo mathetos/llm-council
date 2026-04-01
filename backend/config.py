@@ -436,6 +436,16 @@ else:
     INTERROGATOR_MIN_QUESTIONS = _raw_min
     INTERROGATOR_MAX_QUESTIONS = _raw_max
 
+# Coverage-driven interrogation thresholds.
+# Fraction of required_context_fields that must be "covered" for the interrogator to
+# consider the run high-confidence and skip the confirmation summary.
+INTERROGATOR_COVERAGE_SUFFICIENT = _parse_bounded_float(
+    os.getenv("INTERROGATOR_COVERAGE_SUFFICIENT", "0.8"),
+    default=0.8,
+    minimum=0.0,
+    maximum=1.0,
+)
+
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 

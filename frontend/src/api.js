@@ -253,6 +253,26 @@ export const api = {
   },
 
   /**
+   * Confirm or reject the interrogation summary and proceed.
+   */
+  async confirmInterrogation(conversationId, sessionId, confirmed) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/interrogation/confirm`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ session_id: sessionId, confirmed }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to confirm interrogation');
+    }
+    return response.json();
+  },
+
+  /**
    * Send a message in a conversation.
    */
   async sendMessage(
