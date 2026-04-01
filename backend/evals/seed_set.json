@@ -1,0 +1,188 @@
+{
+  "version": "1.0.0",
+  "frozen_at": "2026-04-01",
+  "description": "Frozen benchmark seed set for eval harness. DO NOT EDIT after freeze.",
+  "holdout_ids": ["mkt_09", "mkt_10", "pd_09", "pd_10", "bd_09", "bd_10"],
+  "prompts": [
+    {
+      "id": "mkt_01",
+      "profile_id": "marketing",
+      "query": "We are launching a B2B SaaS tool for mid-market HR teams. What positioning strategy would differentiate us from established players like BambooHR and Rippling?",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_02",
+      "profile_id": "marketing",
+      "query": "Our email open rates dropped 30% after switching ESPs. What diagnostic framework should we use to identify root cause and recovery plan?",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_03",
+      "profile_id": "marketing",
+      "query": "Design a content marketing funnel for a developer tools startup targeting senior engineers who distrust marketing.",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_04",
+      "profile_id": "marketing",
+      "query": "We have $5,000/month budget and need to generate 50 qualified leads for an enterprise cybersecurity product. What channel mix do you recommend?",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_05",
+      "profile_id": "marketing",
+      "query": "How should we structure A/B tests for our pricing page when we only get 2,000 visitors per month?",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_06",
+      "profile_id": "marketing",
+      "query": "Create a go-to-market messaging framework for a fintech app targeting freelancers who currently use spreadsheets for invoicing.",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_07",
+      "profile_id": "marketing",
+      "query": "What metrics should we track to measure brand awareness growth for a pre-revenue consumer health startup?",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_08",
+      "profile_id": "marketing",
+      "query": "Our competitor just raised $50M and is flooding paid channels. How should a bootstrapped company with strong organic presence respond?",
+      "set": "dev"
+    },
+    {
+      "id": "mkt_09",
+      "profile_id": "marketing",
+      "query": "Design a referral program for a subscription box service with 10,000 active subscribers and 4% monthly churn.",
+      "set": "holdout"
+    },
+    {
+      "id": "mkt_10",
+      "profile_id": "marketing",
+      "query": "What is the most effective way to reposition a product that is perceived as enterprise-only to also appeal to SMBs?",
+      "set": "holdout"
+    },
+    {
+      "id": "pd_01",
+      "profile_id": "product_development",
+      "query": "We need to add multi-tenancy to a monolithic Django app serving 200 customers. What architecture approach minimizes migration risk?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_02",
+      "profile_id": "product_development",
+      "query": "Our mobile app has a 60% day-1 retention but 15% day-30. What product changes should we prioritize to improve long-term retention?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_03",
+      "profile_id": "product_development",
+      "query": "Design an MVP scope for an AI writing assistant targeting non-native English speakers in professional settings. We have 3 engineers and 8 weeks.",
+      "set": "dev"
+    },
+    {
+      "id": "pd_04",
+      "profile_id": "product_development",
+      "query": "How should we approach migrating from REST to GraphQL for a product with 50+ API consumers and no versioning strategy?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_05",
+      "profile_id": "product_development",
+      "query": "Our feature flag system has grown to 400+ flags with no cleanup process. What is the most pragmatic path to managing this technical debt?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_06",
+      "profile_id": "product_development",
+      "query": "We want to add real-time collaboration to our document editor. What are the key architectural tradeoffs between OT and CRDT approaches?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_07",
+      "profile_id": "product_development",
+      "query": "How should we structure a product team of 12 engineers across 3 squads to minimize coordination overhead while shipping a platform rewrite?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_08",
+      "profile_id": "product_development",
+      "query": "Our SaaS platform needs SOC 2 Type II compliance within 6 months. What product and engineering changes should we prioritize?",
+      "set": "dev"
+    },
+    {
+      "id": "pd_09",
+      "profile_id": "product_development",
+      "query": "Design an instrumentation strategy for a checkout flow that has a 70% cart abandonment rate but no event tracking.",
+      "set": "holdout"
+    },
+    {
+      "id": "pd_10",
+      "profile_id": "product_development",
+      "query": "We are building a plugin marketplace for our SaaS product. What governance model balances developer freedom with platform stability?",
+      "set": "holdout"
+    },
+    {
+      "id": "bd_01",
+      "profile_id": "business_development",
+      "query": "We want to partner with Shopify to integrate our inventory management tool. What is the best approach to initiate and structure this partnership?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_02",
+      "profile_id": "business_development",
+      "query": "A Fortune 500 company wants to white-label our product. What deal terms and guardrails should we negotiate to protect our brand?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_03",
+      "profile_id": "business_development",
+      "query": "How should a seed-stage startup approach outbound to enterprise accounts when we have no case studies or brand recognition?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_04",
+      "profile_id": "business_development",
+      "query": "We are expanding from the US to Germany. What are the top 5 market-entry risks and how should we sequence our go-to-market?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_05",
+      "profile_id": "business_development",
+      "query": "Design a channel partner program for a cybersecurity startup targeting MSPs. We have budget for 3 pilot partners.",
+      "set": "dev"
+    },
+    {
+      "id": "bd_06",
+      "profile_id": "business_development",
+      "query": "A competitor is acquiring one of our integration partners. What defensive and offensive moves should we consider?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_07",
+      "profile_id": "business_development",
+      "query": "How should we structure a revenue-share deal with a consulting firm that wants to resell our analytics platform to their clients?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_08",
+      "profile_id": "business_development",
+      "query": "We received inbound interest from 3 potential acquirers while still pre-Series A. How should we evaluate and respond without derailing our fundraise?",
+      "set": "dev"
+    },
+    {
+      "id": "bd_09",
+      "profile_id": "business_development",
+      "query": "Design an enterprise pilot program that converts to paid contracts. Our product is a data pipeline tool and average deal size target is $50K ARR.",
+      "set": "holdout"
+    },
+    {
+      "id": "bd_10",
+      "profile_id": "business_development",
+      "query": "A large customer wants exclusivity in their vertical for 2 years. Under what conditions, if any, should we agree?",
+      "set": "holdout"
+    }
+  ]
+}

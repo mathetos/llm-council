@@ -21,6 +21,7 @@ data/verdicts/*
 !data/verdicts/.gitkeep
 data/reports/*
 !data/reports/.gitkeep
+data/eval_runs/
 
 # Research packet templates are source files and should be versioned
 !data/research_packets/
