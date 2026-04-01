@@ -1,8 +1,7 @@
-# LLM Council
+# LLM Council (@mathetos version)
+<img width="1185" height="795" alt="image" src="https://github.com/user-attachments/assets/d70966ee-02b5-4588-8570-1fcf464168c5" />
 
-This idea is forked from [karpathy/llm-council](https://github.com/karpathy/llm-council).
-
-This project helps you pressure-test important questions with a small "AI advisory group" instead of trusting one model's first take.
+The LLM Council is [@karpathy's](https://github.com/karpathy) excellent idea. This project is a fork and enhancement of the vibe-coded basic setup you can find here: [karpathy/llm-council](https://github.com/karpathy/llm-council).
 
 ## Prerequisites
 
@@ -16,7 +15,9 @@ You will place your OpenRouter key in `.env` as `OPENROUTER_API_KEY`.
 
 ## Why this is useful
 
-If you've ever thought "this answer sounds good, but I don't totally trust it yet," this setup is for that exact moment.
+The LLM Council helps you pressure-test important questions with a small "AI advisory group" instead of trusting one model's first take.
+
+If you've ever thought "this answer sounds good, but I don't totally trust it yet," this setup is designed to resolve those concerns.
 
 Instead of one polished response, you get a full decision flow:
 
