@@ -469,6 +469,21 @@ def save_verdict_markdown(
                 markdown += f"  - {violation}\n"
         markdown += "\n"
 
+    telemetry = (metadata or {}).get("telemetry") if metadata else None
+    if telemetry:
+        markdown += "## Telemetry\n\n"
+        if telemetry.get("total_ms") is not None:
+            markdown += f"- Total runtime: `{telemetry['total_ms']}ms`\n"
+        for stage_key in ("stage1_ms", "stage2_ms", "stage3_ms"):
+            if telemetry.get(stage_key) is not None:
+                markdown += f"- {stage_key.replace('_ms', '').replace('_', ' ').title()}: `{telemetry[stage_key]}ms`\n"
+        total_usage = telemetry.get("total_usage") or {}
+        if total_usage.get("total_tokens"):
+            markdown += f"- Total tokens: `{total_usage['total_tokens']}`\n"
+        if total_usage.get("total_cost") is not None:
+            markdown += f"- Total cost: `${total_usage['total_cost']}`\n"
+        markdown += "\n"
+
     markdown += (
         "## Final Council Answer\n\n"
         f"{response}\n"

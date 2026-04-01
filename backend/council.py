@@ -2,6 +2,7 @@
 
 import asyncio
 import re
+import time
 from typing import List, Dict, Any, Tuple, Optional, Callable, Awaitable
 from .openrouter import query_models_parallel, query_model, query_model_with_error
 from .config import (
@@ -613,17 +614,91 @@ def _apply_guardrail_policy(
     }
 
 
+def _aggregate_usage(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Sum usage fields across a list of result items that may contain 'usage' and 'cost'."""
+    prompt = 0
+    completion = 0
+    total = 0
+    cost = 0.0
+    has_usage = False
+    has_cost = False
+    for item in items:
+        usage = item.get("usage")
+        if isinstance(usage, dict):
+            has_usage = True
+            prompt += usage.get("prompt_tokens") or 0
+            completion += usage.get("completion_tokens") or 0
+            total += usage.get("total_tokens") or 0
+        if item.get("cost") is not None:
+            has_cost = True
+            try:
+                cost += float(item["cost"])
+            except (TypeError, ValueError):
+                pass
+    result: Dict[str, Any] = {}
+    if has_usage:
+        result["prompt_tokens"] = prompt
+        result["completion_tokens"] = completion
+        result["total_tokens"] = total
+    if has_cost:
+        result["total_cost"] = round(cost, 8)
+    return result
+
+
+def _build_telemetry(
+    stage_timings: Dict[str, Dict[str, float]],
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+    stage3_result: Dict[str, Any],
+    total_start: float,
+    total_end: float,
+) -> Dict[str, Any]:
+    """Assemble the telemetry block for assistant metadata."""
+    telemetry: Dict[str, Any] = {
+        "total_ms": round((total_end - total_start) * 1000),
+    }
+
+    for stage_name, timing in stage_timings.items():
+        telemetry[f"{stage_name}_ms"] = round(
+            (timing["end"] - timing["start"]) * 1000
+        )
+
+    telemetry["stage1_usage"] = _aggregate_usage(stage1_results)
+    telemetry["stage2_usage"] = _aggregate_usage(stage2_results)
+    telemetry["stage3_usage"] = _aggregate_usage([stage3_result])
+
+    all_items = list(stage1_results) + list(stage2_results) + [stage3_result]
+    telemetry["total_usage"] = _aggregate_usage(all_items)
+
+    model_details: List[Dict[str, Any]] = []
+    for item in all_items:
+        detail: Dict[str, Any] = {"model": item.get("model")}
+        if item.get("model_used"):
+            detail["model_used"] = item["model_used"]
+        if item.get("usage"):
+            detail["usage"] = item["usage"]
+        if item.get("cost") is not None:
+            detail["cost"] = item["cost"]
+        model_details.append(detail)
+    telemetry["per_model"] = model_details
+
+    return telemetry
+
+
 def _build_assistant_metadata(
     run_context: Optional[Dict[str, Any]],
     label_to_model: Dict[str, str],
     aggregate_rankings: List[Dict[str, Any]],
     diagnostics: Dict[str, Any],
     guardrail_status: Dict[str, Any],
+    telemetry: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build final assistant metadata contract."""
     metadata = _build_stage2_metadata(run_context, label_to_model, aggregate_rankings)
     metadata["diagnostics"] = diagnostics
     metadata["guardrail_status"] = guardrail_status
+    if telemetry is not None:
+        metadata["telemetry"] = telemetry
     return metadata
 
 
@@ -759,16 +834,21 @@ Output constraints:
                 continue
             text = response.get("content") or ""
             validation = validate_required_sections(text, assignment["must_include"] + ["Where I Disagree"])
-            stage1_results.append(
-                {
-                    "model": resolved_model,
-                    "perspective_role_id": assignment["role_id"],
-                    "perspective_role_name": assignment["role_name"],
-                    "response": text,
-                    "role_validation": validation,
-                    "error": err,
-                }
-            )
+            item: Dict[str, Any] = {
+                "model": resolved_model,
+                "perspective_role_id": assignment["role_id"],
+                "perspective_role_name": assignment["role_name"],
+                "response": text,
+                "role_validation": validation,
+                "error": err,
+            }
+            if response.get("usage"):
+                item["usage"] = response["usage"]
+            if response.get("cost") is not None:
+                item["cost"] = response["cost"]
+            if response.get("model_used"):
+                item["model_used"] = response["model_used"]
+            stage1_results.append(item)
         return stage1_results
 
     # Legacy path: same prompt for all models if no profile context provided.
@@ -789,7 +869,14 @@ Output constraints:
     stage1_results = []
     for model, response in responses.items():
         if response is not None:
-            stage1_results.append({"model": model, "response": response.get("content", "")})
+            item: Dict[str, Any] = {"model": model, "response": response.get("content", "")}
+            if response.get("usage"):
+                item["usage"] = response["usage"]
+            if response.get("cost") is not None:
+                item["cost"] = response["cost"]
+            if response.get("model_used"):
+                item["model_used"] = response["model_used"]
+            stage1_results.append(item)
     return stage1_results
 
 
@@ -878,7 +965,6 @@ Now provide your evaluation and ranking:"""
     # Get rankings from all council models in parallel
     responses = await query_models_parallel(selected_models, messages)
 
-    # Format results
     stage2_results = []
     for model, response in responses.items():
         if response is not None:
@@ -889,12 +975,19 @@ Now provide your evaluation and ranking:"""
                 if profile
                 else {"present": {}, "all_present": True}
             )
-            stage2_results.append({
+            item: Dict[str, Any] = {
                 "model": model,
                 "ranking": full_text,
                 "parsed_ranking": parsed,
                 "rubric_coverage": rubric_coverage,
-            })
+            }
+            if response.get("usage"):
+                item["usage"] = response["usage"]
+            if response.get("cost") is not None:
+                item["cost"] = response["cost"]
+            if response.get("model_used"):
+                item["model_used"] = response["model_used"]
+            stage2_results.append(item)
 
     return stage2_results, label_to_model
 
@@ -1005,11 +1098,18 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
     response_text = response.get("content") or ""
     section_validation = validate_required_sections(response_text, required_sections)
-    return {
+    result: Dict[str, Any] = {
         "model": selected_chairman_model,
         "response": response_text,
         "section_validation": section_validation,
     }
+    if response.get("usage"):
+        result["usage"] = response["usage"]
+    if response.get("cost") is not None:
+        result["cost"] = response["cost"]
+    if response.get("model_used"):
+        result["model_used"] = response["model_used"]
+    return result
 
 
 def parse_ranking_from_text(ranking_text: str) -> List[str]:
@@ -1170,14 +1270,19 @@ async def run_full_council(
         run_context["role_assignments"] = role_assignments
         run_context["role_assignment_warnings"] = warnings
 
+    total_start = time.perf_counter()
+    stage_timings: Dict[str, Dict[str, float]] = {}
+
     # Stage 1: Collect individual responses
     await _emit_progress(progress_callback, "stage1_start")
+    stage_timings["stage1"] = {"start": time.perf_counter()}
     stage1_results = await stage1_collect_responses(
         user_query,
         interrogation=interrogation,
         run_context=run_context,
         council_models=selected_models,
     )
+    stage_timings["stage1"]["end"] = time.perf_counter()
     await _emit_progress(progress_callback, "stage1_complete", data=stage1_results)
 
     # If no models responded successfully, return error
@@ -1194,12 +1299,14 @@ async def run_full_council(
 
     # Stage 2: Collect rankings
     await _emit_progress(progress_callback, "stage2_start")
+    stage_timings["stage2"] = {"start": time.perf_counter()}
     stage2_results, label_to_model = await stage2_collect_rankings(
         user_query,
         stage1_results,
         run_context=run_context,
         council_models=selected_models,
     )
+    stage_timings["stage2"]["end"] = time.perf_counter()
 
     # Calculate aggregate rankings
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
@@ -1213,6 +1320,7 @@ async def run_full_council(
 
     # Stage 3: Synthesize final answer
     await _emit_progress(progress_callback, "stage3_start")
+    stage_timings["stage3"] = {"start": time.perf_counter()}
     stage3_result = await stage3_synthesize_final(
         user_query,
         stage1_results,
@@ -1220,16 +1328,23 @@ async def run_full_council(
         run_context=run_context,
         chairman_model=selected_chairman_model,
     )
+    stage_timings["stage3"]["end"] = time.perf_counter()
+    total_end = time.perf_counter()
 
     diagnostics = build_run_diagnostics(stage1_results, stage2_results, stage3_result)
     guardrail_status = evaluate_guardrails(diagnostics)
     stage3_result = _apply_guardrail_policy(stage3_result, guardrail_status)
+    telemetry = _build_telemetry(
+        stage_timings, stage1_results, stage2_results, stage3_result,
+        total_start, total_end,
+    )
     metadata = _build_assistant_metadata(
         run_context,
         label_to_model,
         aggregate_rankings,
         diagnostics,
         guardrail_status,
+        telemetry=telemetry,
     )
     await _emit_progress(
         progress_callback,
