@@ -1,0 +1,124 @@
+{
+  "packet_id": "default",
+  "profile_id": "product_development",
+  "title": "Product Development Intelligence Packet (Curated from NotebookLM Intake)",
+  "as_of": "2026-03-31",
+  "summary": "Curated product-development packet emphasizing problem-solution fit, implementation realism, risk coverage, dependency management, and measurement quality. Intake claims were normalized to architecture-level insights, with confidence adjusted toward source quality and reproducibility.",
+  "facts": [
+    {
+      "statement": "Enterprise LLM deployments are increasingly multi-model, which raises orchestration and routing complexity in production systems.",
+      "confidence": "high",
+      "source": "https://xenoss.io/blog/openai-vs-anthropic-vs-google-gemini-enterprise-llm-platform-guide"
+    },
+    {
+      "statement": "Inference serving architecture can materially change cost and throughput, making infrastructure design a primary implementation decision.",
+      "confidence": "high",
+      "source": "https://introl.com/blog/vllm-production-deployment-inference-serving-architecture"
+    },
+    {
+      "statement": "Many AI product failures are rooted in data quality and operational readiness rather than base model capability alone.",
+      "confidence": "high",
+      "source": "https://www.neuronimbus.com/blog/future-of-digital-products-with-llm-integration"
+    },
+    {
+      "statement": "Formal orchestration layers reduce integration fragility compared with ad-hoc direct model API wiring.",
+      "confidence": "medium",
+      "source": "https://www.techaheadcorp.com/blog/ai-orchestrator-role-in-managing-llms-apis/"
+    },
+    {
+      "statement": "Agent systems with many tools face context-window and routing overhead that can degrade reliability and increase cost.",
+      "confidence": "high",
+      "source": "https://www.stackone.com/blog/notion-mcp-deep-dive/"
+    },
+    {
+      "statement": "Prompt and model behavior are non-deterministic enough that traditional deterministic QA alone is insufficient for release readiness.",
+      "confidence": "high",
+      "source": "https://www.applied-ai.com/briefings/llm-application-lifecycle/"
+    },
+    {
+      "statement": "Safety and performance critics can introduce regressions even when prediction accuracy appears strong.",
+      "confidence": "high",
+      "source": "https://arxiv.org/html/2602.03338v1"
+    },
+    {
+      "statement": "Collaborative multi-agent workflows are vulnerable to error propagation and false-consensus cascades without provenance controls.",
+      "confidence": "high",
+      "source": "https://arxiv.org/abs/2603.04474"
+    },
+    {
+      "statement": "Tiered model routing is a common approach for balancing cost and quality by reserving expensive frontier models for hard cases.",
+      "confidence": "medium",
+      "source": "https://www.applied-ai.com/briefings/llm-application-lifecycle/"
+    },
+    {
+      "statement": "Hosted tool-protocol integrations often enforce read-only boundaries to reduce write-path risk in agentic workflows.",
+      "confidence": "medium",
+      "source": "https://www.notion.com/blog/notions-hosted-mcp-server-an-inside-look"
+    },
+    {
+      "statement": "Long-horizon planning benchmarks continue to show a gap between strong short-form model performance and robust industrial optimization behavior.",
+      "confidence": "high",
+      "source": "https://arxiv.org/html/2506.09050v2"
+    },
+    {
+      "statement": "Release metrics for LLM systems are moving toward multi-dimensional scorecards spanning functional quality, safety, cost, and latency.",
+      "confidence": "high",
+      "source": "https://www.getmaxim.ai/articles/why-evals-matter-the-backbone-of-reliable-ai-in-2025/"
+    }
+  ],
+  "assumptions": [
+    "Problem-solution fit in AI products often fails because teams validate model capability before validating workflow and user pain alignment.",
+    "Narrow, task-scoped agent designs are generally easier to stabilize than monolithic autonomous assistants.",
+    "Synthetic-user and AI-assisted discovery can accelerate research, but should augment rather than replace direct customer evidence.",
+    "Model-agnostic architecture improves resilience as provider quality, pricing, and policy constraints shift.",
+    "Prompt versioning and eval versioning need first-class treatment comparable to code versioning.",
+    "Human-in-the-loop checkpoints remain necessary for high-impact or high-ambiguity tasks even in mature deployments.",
+    "Teams that optimize early for observability and rollback will ship faster over time despite slower first releases.",
+    "Cross-functional alignment (product, engineering, security, operations) is a larger determinant of delivery success than model selection alone."
+  ],
+  "constraints": [
+    "Non-deterministic outputs complicate strict reproducibility and require probabilistic quality gates.",
+    "Data readiness and governance consume substantial implementation capacity and must be budgeted explicitly.",
+    "Multi-provider integrations increase dependency surface area, including auth, quotas, behavior drift, and incident response complexity.",
+    "Large tool catalogs create token and latency overhead unless tool selection is dynamic and constrained.",
+    "Security risks for agentic systems include prompt injection, tool misuse, and unsafe action execution pathways.",
+    "Evaluation quality is constrained by weak or stale test corpora; benchmark coverage can lag production reality.",
+    "Provider-side model updates can silently change behavior, requiring continuous regression monitoring.",
+    "High-throughput inference architecture decisions (caching, quantization, batching) constrain feasible product UX and SLA targets."
+  ],
+  "open_questions": [
+    "Which product surfaces should remain deterministic versus probabilistic to meet user trust expectations?",
+    "What is the minimal orchestration architecture that preserves reliability without unnecessary platform overhead?",
+    "How should model-routing policy balance quality, latency, and cost at different task-complexity bands?",
+    "Which provenance controls are sufficient to prevent multi-agent error cascades in production workflows?",
+    "What intervention policy avoids critic-induced regressions while still catching severe failures early?",
+    "How much synthetic testing can safely substitute for live-user validation in early discovery phases?",
+    "Which eval suite dimensions should be hard launch blockers versus monitoring-only indicators?",
+    "What rollback strategy is required when provider updates degrade one critical workflow but improve others?",
+    "Where should write-enabled tool access be allowed, and which operations must remain human-approved?",
+    "What leading indicators best predict durable problem-solution fit beyond initial pilot engagement?"
+  ],
+  "references": [
+    "https://menlovc.com/perspective/2025-mid-year-llm-market-update/",
+    "https://xenoss.io/blog/openai-vs-anthropic-vs-google-gemini-enterprise-llm-platform-guide",
+    "https://arxiv.org/html/2503.04596v2",
+    "https://www.softwareseni.com/comparing-openai-anthropic-and-google-for-startup-ai-development-in-2025/",
+    "https://downloads.regulations.gov/OMB-2024-0004-0014/attachment_1.pdf",
+    "https://www.techaheadcorp.com/blog/ai-orchestrator-role-in-managing-llms-apis/",
+    "https://aclanthology.org/2025.findings-emnlp.440.pdf",
+    "https://arxiv.org/html/2409.07314v2",
+    "https://www.getmaxim.ai/articles/why-evals-matter-the-backbone-of-reliable-ai-in-2025/",
+    "https://arxiv.org/html/2506.09050v2",
+    "https://arxiv.org/html/2602.03338v1",
+    "https://arxiv.org/abs/2603.04474",
+    "https://www.sentinelone.com/cybersecurity-101/data-and-ai/llm-security-risks/",
+    "https://www.applied-ai.com/briefings/llm-application-lifecycle/",
+    "https://introl.com/blog/vllm-production-deployment-inference-serving-architecture",
+    "https://www.zenml.io/blog/what-1200-production-deployments-reveal-about-llmops-in-2025",
+    "https://www.mindstudio.ai/blog/what-is-ai-agent-harness-stripe-minions",
+    "https://www.stackone.com/blog/notion-mcp-deep-dive/",
+    "https://www.notion.com/blog/notions-hosted-mcp-server-an-inside-look",
+    "https://review.firstround.com/a-research-toolkit-for-the-discovery-phase/",
+    "https://productschool.com/blog/product-fundamentals/product-experimentation"
+  ]
+}

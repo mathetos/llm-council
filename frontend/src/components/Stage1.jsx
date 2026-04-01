@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import './Stage1.css';
+import { TabBar } from './primitives';
 
 export default function Stage1({ responses }) {
   const [activeTab, setActiveTab] = useState(0);
@@ -10,27 +10,26 @@ export default function Stage1({ responses }) {
   }
 
   return (
-    <div className="stage stage1">
-      <h3 className="stage-title">Stage 1: Individual Responses</h3>
+    <section className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <h3 className="text-base font-semibold text-foreground">Stage 1: Individual Responses</h3>
 
-      <div className="tabs">
-        {responses.map((resp, index) => (
-          <button
-            key={index}
-            className={`tab ${activeTab === index ? 'active' : ''}`}
-            onClick={() => setActiveTab(index)}
-          >
-            {resp.model.split('/')[1] || resp.model}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        value={String(activeTab)}
+        onChange={(value) => setActiveTab(Number(value))}
+        options={responses.map((resp, index) => ({
+          value: String(index),
+          label: resp.model.split('/')[1] || resp.model,
+        }))}
+      />
 
-      <div className="tab-content">
-        <div className="model-name">{responses[activeTab].model}</div>
-        <div className="response-text markdown-content">
+      <div className="space-y-2 rounded-md border border-border bg-background p-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {responses[activeTab].model}
+        </div>
+        <div className="markdown-content text-sm text-foreground">
           <ReactMarkdown>{responses[activeTab].response}</ReactMarkdown>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

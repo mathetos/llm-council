@@ -1,0 +1,122 @@
+{
+  "packet_id": "default",
+  "profile_id": "marketing",
+  "title": "Marketing Intelligence Packet (Curated from NotebookLM Intake)",
+  "as_of": "2026-03-31",
+  "summary": "Curated marketing packet focused on strategic clarity, message resonance, differentiation, testability, and execution feasibility. Claims from the intake were deduplicated and confidence-adjusted toward evidence strength, with lower-confidence assertions moved to assumptions and open questions.",
+  "facts": [
+    {
+      "statement": "The B2B buyer journey is increasingly self-directed, with large portions completed before direct vendor engagement.",
+      "confidence": "high",
+      "source": "https://www.kliqinteractive.com/insights/b2b-reports-benchmarks-and-statistics-2024-2025/"
+    },
+    {
+      "statement": "Platform automation is shifting targeting leverage away from manual audience tuning and toward creative/message quality.",
+      "confidence": "medium",
+      "source": "https://www.dataslayer.ai/blog/meta-ads-changes-2025-83-updates-that-changed-facebook-advertising-forever"
+    },
+    {
+      "statement": "Privacy and signal loss continue to weaken the reliability of classic user-level multi-touch attribution alone.",
+      "confidence": "high",
+      "source": "https://www.haus.io/blog/marketing-measurement-the-fundamentals"
+    },
+    {
+      "statement": "Incrementality testing is now a core measurement pattern for validating whether media causes lift, not just correlates with outcomes.",
+      "confidence": "high",
+      "source": "https://business.google.com/us/think/measurement/incrementality-testing/"
+    },
+    {
+      "statement": "Creative diversity that explores different psychological hooks tends to outperform shallow cosmetic ad variants.",
+      "confidence": "medium",
+      "source": "https://www.dataslayer.ai/blog/meta-ads-changes-2025-83-updates-that-changed-facebook-advertising-forever"
+    },
+    {
+      "statement": "B2B marketing organizations are under tighter efficiency pressure and are expected to justify spend with clearer pipeline impact.",
+      "confidence": "high",
+      "source": "https://www.digitalposition.com/resources/blog/news/the-2025-b2b-cmo-playbook-surviving-budget-cuts-ai-disruption-privacy-laws/"
+    },
+    {
+      "statement": "SaaS and martech consolidation pressure is increasing, reducing tolerance for overlapping tools and fragmented workflows.",
+      "confidence": "medium",
+      "source": "https://skaled.com/insights/revops-trends-ai-gtm-trends-outbound-trends/"
+    },
+    {
+      "statement": "First-party data quality is becoming a primary dependency for personalization and measurement in a privacy-constrained environment.",
+      "confidence": "high",
+      "source": "https://www.deloittedigital.com/nl/en/insights/perspective/marketing-trends-2025.html"
+    },
+    {
+      "statement": "Positioning quality improves when teams define competitive alternatives, differentiated value, best-fit customers, and category context explicitly.",
+      "confidence": "high",
+      "source": "https://www.aprildunford.com/post/a-product-positioning-exercise"
+    },
+    {
+      "statement": "Category framing can create strategic differentiation when it reframes the buyer's problem and decision criteria.",
+      "confidence": "medium",
+      "source": "https://www.playbigger.com/media/what-is-category-design-in-marketing-and-why-is-it-an-important-strategy"
+    },
+    {
+      "statement": "Marketing operations teams frequently report audience collision and cross-team coordination as execution bottlenecks.",
+      "confidence": "medium",
+      "source": "https://deselect.com/2025/03/2025-state-of-marketing-operations/"
+    },
+    {
+      "statement": "Search ecosystem quality updates continue to penalize scaled low-value content, increasing the importance of useful, original content.",
+      "confidence": "high",
+      "source": "https://searchengineland.com/library/platforms/google/google-algorithm-updates"
+    },
+    {
+      "statement": "AI-assisted content can increase volume quickly, but trust and resonance degrade when voice quality becomes generic or robotic.",
+      "confidence": "medium",
+      "source": "https://www.sprinklr.com/blog/marketing-trends/"
+    }
+  ],
+  "assumptions": [
+    "For this council use case, the strongest short-term gains come from clearer positioning and channel-message alignment rather than net-new channel expansion.",
+    "Creative strategy quality has more upside than micro-optimizing manual audience settings on highly automated ad platforms.",
+    "The 95/5 demand split is directionally useful for budgeting even if exact percentages vary by niche.",
+    "Sales-objection-informed content will outperform generic thought leadership for conversion influence.",
+    "Most teams currently overstate certainty in attribution and underuse causal testing design.",
+    "In-market demand capture and long-term category education both need budget allocation to avoid pipeline volatility.",
+    "Operational simplification (fewer tools, clearer ownership) will increase execution velocity more than adding new software.",
+    "Buyers evaluate outcomes and risk reduction more than feature lists when options are crowded."
+  ],
+  "constraints": [
+    "Incrementality and holdout designs need stable test windows and can conflict with rapid weekly campaign changes.",
+    "Signal loss and privacy limits constrain deterministic cross-channel user tracking.",
+    "Budget growth is constrained, so recommendations must justify reallocation rather than assuming net-new spend.",
+    "Audience overlap across teams or brands can create message collision and lower campaign efficiency.",
+    "AI-generated output still requires human QA for brand voice, factuality, and compliance.",
+    "Attribution disagreements between marketing, finance, and sales can block decision speed.",
+    "Long B2B sales cycles delay outcome feedback, making short-window optimization decisions noisier.",
+    "Tool and data model fragmentation reduce personalization quality even when media platforms are advanced."
+  ],
+  "open_questions": [
+    "What is the minimum viable measurement stack for this team: MMM-lite, incrementality, and platform reporting mix?",
+    "Which creative angles currently map best to high-intent buyer objections in the active pipeline?",
+    "How should budget be split between in-market demand capture and out-of-market category education for the next two quarters?",
+    "Which channels are genuinely incrementally additive versus cannibalizing existing branded demand?",
+    "What are the leading indicators that should trigger scale-versus-kill decisions in underperforming campaigns?",
+    "How should the team define and audit message resonance quality when using AI-assisted content production?",
+    "Which audience segments are over-targeted or under-served due to current data model limitations?",
+    "What governance model best prevents cross-team audience collision and conflicting outbound messaging?",
+    "How should attribution confidence be communicated to executives so budget decisions reflect uncertainty honestly?",
+    "What is the right cadence for rerunning positioning validation as product capabilities and market context change?"
+  ],
+  "references": [
+    "https://www.forrester.com/report/2024-b2b-marketing-budget-benchmarks-partner-ecosystem-channel-marketing/RES182133",
+    "https://www.digitalposition.com/resources/blog/news/the-2025-b2b-cmo-playbook-surviving-budget-cuts-ai-disruption-privacy-laws/",
+    "https://www.dataslayer.ai/blog/meta-ads-changes-2025-83-updates-that-changed-facebook-advertising-forever",
+    "https://business.google.com/us/think/measurement/incrementality-testing/",
+    "https://www.haus.io/blog/marketing-measurement-the-fundamentals",
+    "https://www.researchgate.net/publication/389619662_Measuring_digital_advertising_in_a_post-cookie_era_A_study_of_marketing-mix_models_attribution_and_incrementality",
+    "https://www.aprildunford.com/post/a-product-positioning-exercise",
+    "https://www.playbigger.com/media/what-is-category-design-in-marketing-and-why-is-it-an-important-strategy",
+    "https://deselect.com/2025/03/2025-state-of-marketing-operations/",
+    "https://skaled.com/insights/revops-trends-ai-gtm-trends-outbound-trends/",
+    "https://searchengineland.com/library/platforms/google/google-algorithm-updates",
+    "https://www.deloittedigital.com/nl/en/insights/perspective/marketing-trends-2025.html",
+    "https://kliqinteractive.com/insights/b2b-reports-benchmarks-and-statistics-2024-2025/",
+    "https://www.sprinklr.com/blog/marketing-trends/"
+  ]
+}

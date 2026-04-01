@@ -1,0 +1,15 @@
+{
+  "name": "llm-council",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "server": "node scripts/run-backend.cjs",
+    "start": "concurrently -k -n api,web -c blue,magenta \"node scripts/run-backend.cjs\" \"npm run dev --prefix frontend\"",
+    "build": "npm run build --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "preview": "npm run preview --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,87 +1,200 @@
 # LLM Council
 
-![llmcouncil](header.jpg)
+This idea is forked from [karpathy/llm-council](https://github.com/karpathy/llm-council).
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+This project helps you pressure-test important questions with a small "AI advisory group" instead of trusting one model's first take.
 
-In a bit more detail, here is what happens when you submit a query:
+## Prerequisites
 
-1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
-2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+Before using this project, make sure you have:
 
-## Vibe Code Alert
+- **Cursor with AI chat access** (using Claude in Cursor works great for day-to-day edits and prompt iteration)
+- **An OpenRouter account + API key** with available credits
+- **Model access in OpenRouter** for the model IDs configured in this repo
 
-This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+You will place your OpenRouter key in `.env` as `OPENROUTER_API_KEY`.
+
+## Why this is useful
+
+If you've ever thought "this answer sounds good, but I don't totally trust it yet," this setup is for that exact moment.
+
+Instead of one polished response, you get a full decision flow:
+
+- independent first takes from multiple models
+- anonymous peer critique (so they judge ideas, not model brands)
+- one final synthesis that weighs both arguments and objections
+
+The payoff is usually:
+
+- fewer blind spots
+- clearer tradeoffs
+- better confidence before you commit to a plan
+
+## How this version is scoped
+
+This version is tuned for real-world decision work where context and consistency matter:
+
+- an opening "interrogation" step to help refine the problem you are trying to solve so the council has enough context to give accurate responses
+- profile-based roles and rubrics so output matches your use case
+- optional research packets to ground the discussion
+- guardrail status you can actually see per run
+- save your verdicts as markdown locally or re-run the same question with different models
+
+## What this project includes
+
+### Four-stage workflow
+
+1. **Interrogator (Stage 0)** asks a few context questions on a new thread (default 2-5) so the council does not guess your intent.
+2. **Stage 1** collects independent responses in parallel.
+3. **Stage 2** anonymizes responses, then models critique and rank them.
+4. **Stage 3** produces one final council answer.
+
+### Profile-driven guidance
+
+Runs can be shaped by a profile:
+
+- `marketing`
+- `product_development`
+- `business_development`
+
+Profiles keep things focused. They define perspective roles, evaluation rubrics, and output structure so the council stays aligned with the actual job you're trying to do.
+
+### Research packets
+
+Research packets are optional context packs you can attach per profile. They give the council shared grounding up front (facts, assumptions, constraints, open questions, references) before deliberation starts.
+
+### Guardrail status
+
+Each run emits guardrail status and diagnostics:
+
+- `pass`
+- `degraded`
+- `fail` (when strict mode is enabled)
+
+This gives you a quick quality signal instead of having to guess how disciplined the run was.
+
+### Practical UX additions
+
+- save final answers as markdown verdict files
+- per-conversation deletion from sidebar history
+- settings modal for model pairing choices
+- shared orchestration path for sync and stream endpoints (same stage/metadata behavior)
 
 ## Setup
 
-### 1. Install Dependencies
+If you just want to use the app, you mainly need a valid OpenRouter key and one command to start.
 
-The project uses [uv](https://docs.astral.sh/uv/) for project management.
+### 1) Install dependencies
 
-**Backend:**
+Backend (Python):
+
 ```bash
 uv sync
 ```
 
-**Frontend:**
+Frontend (Node):
+
 ```bash
 cd frontend
 npm install
 cd ..
 ```
 
-### 2. Configure API Key
+### 2) Configure environment
 
-Create a `.env` file in the project root:
+Create `.env` in the project root:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-...
+BACKEND_PORT=8001
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+Get your key from [openrouter.ai](https://openrouter.ai/).
 
-### 3. Configure Models (Optional)
+## Run the app
 
-Edit `backend/config.py` to customize the council:
+Default URLs:
 
-```python
-COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
-]
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8001`
 
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
-```
+Start both together (recommended):
 
-## Running the Application
-
-**Option 1: Use the start script**
 ```bash
-./start.sh
+npm run start
 ```
 
-**Option 2: Run manually**
+Or run separately:
 
-Terminal 1 (Backend):
+Backend:
+
 ```bash
-uv run python -m backend.main
+npm run server
 ```
 
-Terminal 2 (Frontend):
+Frontend:
+
 ```bash
-cd frontend
 npm run dev
 ```
 
-Then open http://localhost:5173 in your browser.
+## Configuration details
 
-## Tech Stack
+Edit `backend/config.py` (or env vars) to control:
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
-- **Frontend:** React + Vite, react-markdown for rendering
-- **Storage:** JSON files in `data/conversations/`
-- **Package Management:** uv for Python, npm for JavaScript
+- council model list
+- chairman model
+- interrogator model and min/max question bounds
+- profile defaults
+- guardrail enforcement mode and thresholds
+
+Key settings include:
+
+```python
+COUNCIL_MODELS = [
+    "google/gemini-3.1-flash-lite-preview",
+    "anthropic/claude-sonnet-4.6",
+    "openai/gpt-4o-mini",
+]
+
+CHAIRMAN_MODEL = "google/gemini-2.5-flash"
+INTERROGATOR_MIN_QUESTIONS = 2
+INTERROGATOR_MAX_QUESTIONS = 5
+DEFAULT_PROFILE_ID = "marketing"
+GUARDRAIL_ENFORCEMENT_MODE = "degraded"  # off | degraded | strict_fail
+```
+
+## Research packet format
+
+How these packets were created:
+
+- We started with source notes and research intake for each domain (for example, marketing context from NotebookLM-assisted synthesis and working notes).
+- Then we distilled that into a standard JSON shape so every run gets consistent, structured context.
+- We split information by type on purpose: facts, assumptions, constraints, open questions, and references.
+- Think of packets as living context docs: update them as your market, product, or strategy evolves.
+
+Packet path pattern:
+
+```text
+data/research_packets/<profile_id>/<packet_id>.json
+```
+
+Required fields:
+
+- `packet_id`, `profile_id`, `title`, `as_of`, `summary`
+- `facts` (non-empty; each fact has `statement` and `confidence` of `high|medium|low`)
+- `assumptions`, `constraints`, `open_questions`, `references` (lists)
+
+## Developer notes
+
+- Run backend from project root as: `python -m backend.main`
+- Backend default port is `8001`
+- Frontend API base resolves via `VITE_API_BASE` or backend port fallback
+- Sync and stream message routes share the same orchestration path
+- Architecture details and contributor guidance live in `AGENTS.md`
+
+## Troubleshooting
+
+- `ERR_CONNECTION_REFUSED`: backend is down or port mismatch
+- Port in use: change `BACKEND_PORT` in `.env` and restart
+- Missing model responses: verify OpenRouter credits and model IDs

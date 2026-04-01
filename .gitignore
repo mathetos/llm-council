@@ -11,11 +11,28 @@ wheels/
 
 # Keys and secrets
 .env
+.env.*
+!.env.example
 
-# Data files
-data/
+# Data files (runtime outputs)
+data/conversations/*
+!data/conversations/.gitkeep
+data/verdicts/*
+!data/verdicts/.gitkeep
+data/reports/*
+!data/reports/.gitkeep
 
-# Frontend
+# Research packet templates are source files and should be versioned
+!data/research_packets/
+!data/research_packets/**
+
+# Local/dev caches and one-off artifacts
+.pytest_cache/
+temp/
+*.log
+
+# Node (root + frontend)
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/

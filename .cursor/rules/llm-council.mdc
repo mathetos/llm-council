@@ -1,0 +1,6 @@
+---
+description: LLM Council — architecture, ports, and constraints
+alwaysApply: true
+---
+
+Read **AGENTS.md** at the project root before changing backend council logic, OpenRouter integration, or Stage 2 ranking/parsing. Backend port is **8001** (must stay in sync with `frontend/src/api.js`). Run the API as `python -m backend.main` from the repo root.

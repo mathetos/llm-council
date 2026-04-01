@@ -1,0 +1,123 @@
+{
+  "packet_id": "default",
+  "profile_id": "business_development",
+  "title": "Business Development Intelligence Packet (Curated from NotebookLM Intake)",
+  "as_of": "2026-03-31",
+  "summary": "Curated business-development packet emphasizing deal plausibility, stakeholder strategy, objection readiness, commercial quality, and next-step specificity. Intake claims were normalized to robust, source-linked insights with confidence adjusted for evidence strength.",
+  "facts": [
+    {
+      "statement": "B2B buyers complete substantial evaluation work before direct vendor engagement, reducing the time window for seller-led influence.",
+      "confidence": "high",
+      "source": "https://corporatevisions.com/blog/b2b-buying-behavior-statistics-trends/"
+    },
+    {
+      "statement": "Enterprise buying committees continue to grow in size and cross-functional complexity, increasing alignment overhead in deals.",
+      "confidence": "high",
+      "source": "https://intentsify.io/blog/how-b2b-buying-groups-are-evolving/"
+    },
+    {
+      "statement": "Sales cycles in complex B2B motions remain long and are vulnerable to stalls caused by internal misalignment.",
+      "confidence": "high",
+      "source": "https://jtn.group/articles/changes-in-the-b2b-buyer-journey"
+    },
+    {
+      "statement": "CFO and procurement scrutiny has increased for larger software purchases, raising the bar for ROI and commercial defensibility.",
+      "confidence": "high",
+      "source": "https://www.brex.com/journal/procurement-trends-shaping-corporate-strategies"
+    },
+    {
+      "statement": "AI-related software spend is increasing, and vendors are commonly introducing price uplifts linked to AI packaging changes.",
+      "confidence": "medium",
+      "source": "https://www.tropicapp.io/reports/software-spending-trends-2025"
+    },
+    {
+      "statement": "Data trust and compliance readiness have become hard commercial gates in many enterprise evaluations.",
+      "confidence": "high",
+      "source": "https://sanguinesa.com/your-guide-to-compliant-b2b-data-practices-in-2025/"
+    },
+    {
+      "statement": "RevOps maturity correlates with stronger conversion performance and faster revenue execution.",
+      "confidence": "medium",
+      "source": "https://www.putitforward.com/revenue/revops-framework-for-growth"
+    },
+    {
+      "statement": "Top-performing teams enforce speed-to-lead and stage-exit discipline as practical levers for improving pipeline outcomes.",
+      "confidence": "high",
+      "source": "https://www.dealsignal.com/revops-benchmarks-q2-2025-pipeline-ai-data-quality/"
+    },
+    {
+      "statement": "Mutual Action Plans are widely used in complex enterprise deals to reduce ambiguity around owners, milestones, and decision checkpoints.",
+      "confidence": "high",
+      "source": "https://www.highspot.com/blog/mutual-action-plan/"
+    },
+    {
+      "statement": "Partner ecosystems are shifting from pure transaction models toward outcome-oriented collaboration and enablement.",
+      "confidence": "medium",
+      "source": "https://channelasservice.com/channel-partner-saas-program-models-in-2025-trends-strategies-and-future-predictions/"
+    },
+    {
+      "statement": "Third-party influence and peer validation materially shape shortlist formation before sellers are invited into active evaluation.",
+      "confidence": "medium",
+      "source": "https://www.coveo.com/blog/winning-over-the-modern-b2b-buyer/"
+    },
+    {
+      "statement": "Vague next steps and unowned dependencies are common precursors to deal slippage in long-cycle enterprise motions.",
+      "confidence": "high",
+      "source": "https://www.highspot.com/blog/mutual-action-plan/"
+    }
+  ],
+  "assumptions": [
+    "Being on the initial buyer shortlist has greater impact on win probability than late-stage persuasion quality alone.",
+    "Multithreading across stakeholders is increasingly mandatory because single-champion strategies are fragile over long cycles.",
+    "Commercial resilience now depends more on pricing structure and uplift protections than headline discount percentage.",
+    "Trust-based outreach and transparent data handling will outperform aggressive outbound patterns over the next planning horizon.",
+    "Shared-risk and outcome-oriented deal structures will continue expanding in complex enterprise categories.",
+    "Partner incentives tied to adoption and retention are likely to outperform pure booking-based incentives in ecosystem motions.",
+    "RevOps foundation quality is a gating factor for effective AI-assisted business development operations.",
+    "Sense-making sales enablement will outperform feature-dump messaging as buyer journeys become more nonlinear."
+  ],
+  "constraints": [
+    "Seller interaction time is constrained because buyers self-educate heavily before first contact.",
+    "Large deals require cross-functional internal approvals, introducing predictable process bottlenecks.",
+    "Compliance and privacy constraints can block outreach and procurement regardless of product quality.",
+    "Consumption and hybrid pricing models increase commercial variability and require stronger forecast hygiene.",
+    "CRM and data hygiene gaps constrain conversion, attribution, and pipeline inspection quality.",
+    "Champion turnover risk is high in long cycles and can reset internal deal momentum.",
+    "Partner-channel complexity increases coordination overhead unless enablement and ownership are explicit.",
+    "Relationship-building tactics are resource-intensive and difficult to justify without clear measurement plans."
+  ],
+  "open_questions": [
+    "What repeatable pre-shortlist influence motions most reliably improve day-one vendor inclusion in our target segment?",
+    "Which stakeholder map pattern best predicts stall risk by deal type and ACV band?",
+    "How should commercial offers balance upfront discounts versus long-term uplift protections and usage volatility?",
+    "What objection playbook is most effective for privacy/compliance concerns without lengthening cycle time?",
+    "Which RevOps data-quality thresholds should be treated as launch blockers for AI-assisted outbound workflows?",
+    "Where should MAP milestones be standardized, and where should they remain account-specific?",
+    "What is the right ratio of partner-led versus direct-seller activity for pipeline quality, not just volume?",
+    "How can dark-social and peer-network influence be approximated for board-level reporting without false precision?",
+    "Which leading indicators should trigger active rescue plans for stalled opportunities?",
+    "What is the most defensible near-term benchmark set for commercial-quality scoring across segments?"
+  ],
+  "references": [
+    "https://corporatevisions.com/blog/b2b-buying-behavior-statistics-trends/",
+    "https://jtn.group/articles/changes-in-the-b2b-buyer-journey",
+    "https://intentsify.io/blog/how-b2b-buying-groups-are-evolving/",
+    "https://www.coveo.com/blog/winning-over-the-modern-b2b-buyer/",
+    "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/five-fundamental-truths-how-b2b-winners-keep-growing",
+    "https://www.brex.com/journal/procurement-trends-shaping-corporate-strategies",
+    "https://www.tropicapp.io/reports/software-spending-trends-2025",
+    "https://www.icebergiq.com/resource-library/10-saas-win-loss-trends-from-2025-that-will-shape-how-companies-win-more-deals",
+    "https://saasandco.com/f/revenue-operations-benchmarks-for-2025",
+    "https://www.dealsignal.com/revops-benchmarks-q2-2025-pipeline-ai-data-quality/",
+    "https://www.putitforward.com/revenue/revops-framework-for-growth",
+    "https://sanguinesa.com/your-guide-to-compliant-b2b-data-practices-in-2025/",
+    "https://www.highspot.com/blog/mutual-action-plan/",
+    "https://flowstatesales.com/resource-hub/mutual-action-plans/",
+    "https://www.sendtrumpet.com/blog-posts/how-to-use-a-sales-mutual-action-plan-examples-and-templates",
+    "https://gtmbuddy.ai/blog/how-to-create-mutual-action-plans-to-streamline-b2b-sales",
+    "https://channelasservice.com/channel-partner-saas-program-models-in-2025-trends-strategies-and-future-predictions/",
+    "https://www.thechannelco.com/article/state-of-partner-marketing-2025",
+    "https://www.itagroup.com/insights/channel-partner-engagement/trends-the-best-channel-partner-programs-are-adopting",
+    "https://www.concord.app/blog/procurement-cost-reduction-strategies-2025"
+  ]
+}
