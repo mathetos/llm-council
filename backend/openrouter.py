@@ -42,12 +42,24 @@ async def query_model_with_error(
             data = response.json()
             message = data["choices"][0]["message"]
 
-            return {
+            result: Dict[str, Any] = {
                 "content": message.get("content"),
                 "reasoning_details": message.get("reasoning_details"),
-                # Routers (e.g., openrouter/free) may resolve to a different underlying model.
                 "model_used": data.get("model"),
-            }, None
+            }
+
+            usage = data.get("usage")
+            if isinstance(usage, dict):
+                result["usage"] = {
+                    "prompt_tokens": usage.get("prompt_tokens"),
+                    "completion_tokens": usage.get("completion_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                }
+
+            if data.get("cost") is not None:
+                result["cost"] = data["cost"]
+
+            return result, None
 
     except httpx.HTTPStatusError as e:
         detail = (e.response.text or str(e))[:800]
