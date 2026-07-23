@@ -73,6 +73,17 @@ class ModelPairingApiTests(unittest.TestCase):
         self.assertIn("premium", ids)
         self.assertIn("free_auto_router", ids)
         self.assertEqual(ids, {"premium", "free_auto_router"})
+        smart = payload.get("smart_defaults") or {}
+        self.assertIn("premium", smart)
+        self.assertIn("marketing", smart["premium"])
+        marketing_premium = smart["premium"]["marketing"]
+        self.assertIn("interrogator_model", marketing_premium)
+        self.assertIn("chairman_model", marketing_premium)
+        self.assertIn("systems_thinker", marketing_premium.get("role_models") or {})
+        # Free Stage 0/3 must not use the opaque free router.
+        free_marketing = smart["free_auto_router"]["marketing"]
+        self.assertNotEqual(free_marketing["interrogator_model"], "openrouter/free")
+        self.assertNotEqual(free_marketing["chairman_model"], "openrouter/free")
 
     def test_test_pairing_returns_actionable_failure_hint(self):
         with patch(

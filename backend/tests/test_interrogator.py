@@ -110,6 +110,152 @@ class InterrogatorLogicTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Original Query", sent_prompt)
 
 
+class PacketOpenQuestionMandateTests(unittest.IsolatedAsyncioTestCase):
+    """Phase 2: interrogator prompts must prioritize unresolved packet open questions."""
+
+    PACKET = {
+        "packet_id": "seo-aeo-post-2025-11",
+        "title": "SEO/AEO Packet",
+        "as_of": "2026-07-01",
+        "summary": "Summary",
+        "facts": [{"statement": "Fact", "confidence": "high"}],
+        "assumptions": [],
+        "constraints": [],
+        "open_questions": [
+            "What kill criteria end a content or on-page AEO experiment on priority prompts?",
+            "Which answer engines should this run optimize for first: AI Overviews, ChatGPT search, or Perplexity?",
+        ],
+        "references": [],
+    }
+
+    async def _capture_question_prompt(self, steps):
+        capture = {}
+
+        async def fake_query(model, messages, timeout=None):
+            capture["prompt"] = messages[0]["content"]
+            return {"content": "What is your budget?"}, None
+
+        with patch("backend.council.query_model_with_error", new=fake_query):
+            await council.generate_interrogator_question(
+                "Plan our AEO push",
+                steps,
+                run_context={"profile": None, "research_packet": self.PACKET},
+            )
+        return capture["prompt"]
+
+    async def test_question_prompt_lists_unresolved_open_questions_first(self):
+        prompt = await self._capture_question_prompt([])
+        self.assertIn("Unresolved research-packet open questions (HIGHEST PRIORITY)", prompt)
+        self.assertIn("kill criteria", prompt)
+        self.assertIn("answer engines", prompt)
+
+    async def test_addressed_open_question_drops_out_of_prompt(self):
+        steps = [
+            {
+                "question": (
+                    "What kill criteria should end the on-page AEO experiment "
+                    "on your priority prompts?"
+                ),
+                "answer": "No citations after 6 weeks",
+                "deferred": False,
+            }
+        ]
+        prompt = await self._capture_question_prompt(steps)
+        # Inspect only the priority block; the packet context below it still
+        # lists every open question by design.
+        priority_block = prompt.split("Profile and packet context:")[0]
+        self.assertIn("Unresolved research-packet open questions", priority_block)
+        self.assertNotIn("kill criteria end a content", priority_block)
+        self.assertIn("answer engines", priority_block)
+
+    async def test_coverage_prompt_includes_unresolved_open_questions(self):
+        capture = {}
+
+        async def fake_query(model, messages, timeout=None):
+            capture["prompt"] = messages[0]["content"]
+            return {"content": "- goal: COVERED\nDECISION: STOP\nSUMMARY: ok"}, None
+
+        steps = [{"question": "Q1?", "answer": "A1", "deferred": False}] * 2
+        with patch("backend.council.query_model_with_error", new=fake_query):
+            await council.assess_interrogation_coverage(
+                "Plan our AEO push",
+                steps,
+                ["goal"],
+                min_questions=2,
+                max_questions=5,
+                research_packet=self.PACKET,
+            )
+        self.assertIn("Unresolved research-packet open questions", capture["prompt"])
+        self.assertIn("kill criteria", capture["prompt"])
+
+    async def test_coverage_prompt_omits_block_without_packet(self):
+        capture = {}
+
+        async def fake_query(model, messages, timeout=None):
+            capture["prompt"] = messages[0]["content"]
+            return {"content": "- goal: COVERED\nDECISION: STOP\nSUMMARY: ok"}, None
+
+        steps = [{"question": "Q1?", "answer": "A1", "deferred": False}] * 2
+        with patch("backend.council.query_model_with_error", new=fake_query):
+            await council.assess_interrogation_coverage(
+                "Plan our AEO push",
+                steps,
+                ["goal"],
+                min_questions=2,
+                max_questions=5,
+            )
+        self.assertNotIn("Unresolved research-packet open questions", capture["prompt"])
+
+    def test_stage1_context_calls_out_unresolved_packet_questions(self):
+        interrogation = {
+            "completed": True,
+            "summary": "- Goal: AEO visibility",
+            "steps": [{"question": "Q?", "answer": "A", "deferred": False}],
+            "packet_open_questions": {
+                "total": 2,
+                "addressed": [self.PACKET["open_questions"][0]],
+                "unresolved": [self.PACKET["open_questions"][1]],
+            },
+        }
+        context = council.format_interrogation_context(interrogation)
+        self.assertIn("Unresolved Research-Packet Open Questions", context)
+        self.assertIn("answer engines", context)
+        self.assertNotIn("kill criteria", context)
+
+    def test_build_interrogation_payload_tracks_packet_open_questions(self):
+        session = {
+            "conversation_id": "c1",
+            "model": "test/model",
+            "model_pairing_id": "premium",
+            "model_resolution": {},
+            "profile_id": "marketing",
+            "profile_name": "Marketing Council",
+            "packet_id": self.PACKET["packet_id"],
+            "packet_title": self.PACKET["title"],
+            "packet_as_of": self.PACKET["as_of"],
+            "research_packet": self.PACKET,
+            "min_questions": 2,
+            "max_questions": 5,
+            "summary": "- s",
+            "steps": [
+                {
+                    "question": (
+                        "What kill criteria should end the on-page AEO experiment "
+                        "on your priority prompts?"
+                    ),
+                    "answer": "No citations after 6 weeks",
+                    "deferred": False,
+                },
+                {"question": "What is your budget?", "answer": "1000", "deferred": False},
+            ],
+        }
+        payload = main._build_interrogation_payload(session)
+        tracking = payload["packet_open_questions"]
+        self.assertEqual(tracking["total"], 2)
+        self.assertEqual(tracking["addressed"], [self.PACKET["open_questions"][0]])
+        self.assertEqual(tracking["unresolved"], [self.PACKET["open_questions"][1]])
+
+
 class InterrogatorApiTests(unittest.TestCase):
     """API-level tests for first-message gating and interrogation flow."""
 
@@ -149,12 +295,26 @@ class InterrogatorApiTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_interrogation_start_answer_done_flow(self):
+        ask_next_assessment = {
+            "coverage": {"fields": {}, "coverage_ratio": 0.4},
+            "decision": "ask_next",
+            "next_question": None,
+            "confirmation_summary": None,
+            "error": None,
+        }
+        stop_assessment = {
+            "coverage": {"fields": {}, "coverage_ratio": 0.9},
+            "decision": "stop_sufficient",
+            "next_question": None,
+            "confirmation_summary": None,
+            "error": None,
+        }
         with patch(
             "backend.main.generate_interrogator_question",
             new=AsyncMock(side_effect=[("Q1?", None), ("Q2?", None)]),
         ), patch(
-            "backend.main.should_continue_interrogation",
-            new=AsyncMock(side_effect=[(True, None), (False, None)]),
+            "backend.main.assess_interrogation_coverage",
+            new=AsyncMock(side_effect=[ask_next_assessment, stop_assessment]),
         ), patch(
             "backend.main.summarize_interrogation",
             new=AsyncMock(return_value="- Summary bullet"),

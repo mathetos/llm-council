@@ -5,6 +5,7 @@ import re
 import time
 from typing import List, Dict, Any, Tuple, Optional, Callable, Awaitable
 from .openrouter import query_models_parallel, query_model, query_model_with_error
+from .packet_questions import unresolved_packet_open_questions
 from .config import (
     COUNCIL_MODELS,
     CHAIRMAN_MODEL,
@@ -96,6 +97,16 @@ async def generate_interrogator_question(
         )
     packet_context = format_research_packet_context(packet)
     packet_context = packet_context if packet_context else "(no research packet provided)"
+    unresolved = unresolved_packet_open_questions(packet, steps)
+    open_questions_block = ""
+    if unresolved:
+        numbered = "\n".join(f"{idx}. {oq}" for idx, oq in enumerate(unresolved, start=1))
+        open_questions_block = (
+            "\nUnresolved research-packet open questions (HIGHEST PRIORITY):\n"
+            f"{numbered}\n"
+            "Base your next question on one of these before asking anything generic. "
+            "Rephrase it for the user's situation; do not invent a new topic while any remain.\n"
+        )
 
     prompt = f"""You are the Interrogator for an LLM Council.
 Your job is to ask exactly ONE clarifying question at a time to improve final answer quality.
@@ -103,11 +114,11 @@ Your job is to ask exactly ONE clarifying question at a time to improve final an
 Rules:
 - Ask only one question.
 - Keep it concise and high-information.
-- Prefer unresolved constraints, goals, audience, timeline, and success criteria.
+- Prefer unresolved research-packet open questions first, then unresolved constraints, goals, audience, timeline, and success criteria.
 - The user may defer an aspect to the council; if so, ask about another critical unknown.
 - Current question count: {asked}. Target range for this run: {min_questions} to {max_questions}.
 - Output only the question text, nothing else.
-
+{open_questions_block}
 Profile and packet context:
 {profile_context}
 {packet_context}
@@ -223,6 +234,7 @@ async def assess_interrogation_coverage(
     max_questions: int = INTERROGATOR_MAX_QUESTIONS,
     interrogator_model: str = INTERROGATOR_MODEL,
     coverage_sufficient: float = INTERROGATOR_COVERAGE_SUFFICIENT,
+    research_packet: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Assess coverage of required context fields and decide next action.
@@ -237,12 +249,20 @@ async def assess_interrogation_coverage(
     asked = len(steps)
     transcript = _interrogation_steps_text(steps) or "(no answers yet)"
     fields_text = ", ".join(required_fields) if required_fields else "(none)"
+    unresolved = unresolved_packet_open_questions(research_packet, steps)
+    open_questions_block = ""
+    if unresolved:
+        numbered = "\n".join(f"{idx}. {oq}" for idx, oq in enumerate(unresolved, start=1))
+        open_questions_block = (
+            "\nUnresolved research-packet open questions (target these first if you ask another question):\n"
+            f"{numbered}\n"
+        )
 
     prompt = f"""You are the Interrogator for an LLM Council.
 Evaluate how well the user's query and answers so far cover the required context fields.
 
 Required context fields: {fields_text}
-
+{open_questions_block}
 For each field, output exactly one line in this format:
 - field_name: COVERED | PARTIAL | MISSING
 
@@ -251,7 +271,7 @@ Then on a new line, output DECISION: followed by one of:
 - STOP (if coverage is sufficient for a high-quality council run)
 
 If DECISION is ASK_NEXT, output on the next line:
-NEXT_QUESTION: <your single clarifying question targeting the biggest gap>
+NEXT_QUESTION: <your single clarifying question targeting the biggest gap; if any unresolved research-packet open questions are listed above, base the question on one of those first>
 
 If DECISION is STOP, output on the next line:
 SUMMARY: <2-3 sentence summary of what the user is asking, noting any remaining gaps>
@@ -423,6 +443,14 @@ def format_interrogation_context(interrogation: Optional[Dict[str, Any]]) -> str
                 "Unresolved Context Gaps (state your assumptions explicitly for these):\n"
                 + "\n".join(f"- {field}" for field in gaps)
             )
+
+    packet_oq = interrogation.get("packet_open_questions")
+    if isinstance(packet_oq, dict) and packet_oq.get("unresolved"):
+        sections.append(
+            "Unresolved Research-Packet Open Questions (the user did not settle these; "
+            "state the assumption you are making for each):\n"
+            + "\n".join(f"- {oq}" for oq in packet_oq["unresolved"])
+        )
 
     return "\n\n".join(sections).strip()
 
@@ -782,6 +810,7 @@ def _build_stage2_metadata(
         "role_assignment_warnings": context.get("role_assignment_warnings", []),
         "model_resolution": context.get("model_resolution", {}),
         "fallback_events": context.get("fallback_events", []),
+        "repair_events": context.get("repair_events", []),
     }
 
 
@@ -916,6 +945,155 @@ async def _emit_progress(
     await progress_callback(event)
 
 
+def _record_repair_event(
+    run_context: Optional[Dict[str, Any]],
+    *,
+    slot: str,
+    model: str,
+    missing_before: List[str],
+    success: bool,
+) -> None:
+    """Record a compliance repair attempt in run context (surfaces in metadata)."""
+    if run_context is None:
+        return
+    run_context.setdefault("repair_events", []).append(
+        {
+            "slot": slot,
+            "model": model,
+            "missing_before": missing_before,
+            "success": success,
+        }
+    )
+
+
+async def _repair_stage1_noncompliant(
+    stage1_results: List[Dict[str, Any]],
+    role_assignments: List[Dict[str, Any]],
+    run_context: Optional[Dict[str, Any]],
+) -> None:
+    """
+    One repair retry per Stage 1 response that misses required section labels.
+
+    Asks the same model to reformat its own answer with the exact labels. Keeps
+    the original answer when the repair fails or is still non-compliant.
+    """
+    required_by_role = {
+        assignment["role_id"]: assignment["must_include"] + ["Where I Disagree"]
+        for assignment in role_assignments
+    }
+
+    async def _repair(item: Dict[str, Any]) -> None:
+        required = required_by_role.get(item.get("perspective_role_id"), [])
+        missing = item.get("role_validation", {}).get("missing", [])
+        labels = "\n".join(f"- {label}" for label in required)
+        prompt = f"""Your previous council answer failed automated validation because it was
+missing these required section labels: {', '.join(missing)}.
+
+Rewrite the answer so it contains ALL of these section labels verbatim as markdown headings:
+{labels}
+
+Keep your substantive analysis. Reorganize it under the labels and add content for
+any section you had not covered. Output only the rewritten answer.
+
+Previous answer:
+{item.get('response', '')}
+"""
+        response, _err = await query_model_with_error(
+            item["model"],
+            [{"role": "user", "content": prompt}],
+        )
+        repaired_text = (response or {}).get("content") or ""
+        revalidation = validate_required_sections(repaired_text, required)
+        if revalidation["valid"]:
+            item["response"] = repaired_text
+            item["role_validation"] = revalidation
+            item["repaired"] = True
+        _record_repair_event(
+            run_context,
+            slot="stage1_role",
+            model=item["model"],
+            missing_before=missing,
+            success=revalidation["valid"],
+        )
+
+    failing = [
+        item
+        for item in stage1_results
+        if item.get("role_validation") and not item["role_validation"].get("valid", True)
+    ]
+    if failing:
+        await asyncio.gather(*[_repair(item) for item in failing])
+
+
+async def _repair_stage2_noncompliant(
+    stage2_results: List[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    run_context: Optional[Dict[str, Any]],
+) -> None:
+    """
+    One repair retry per Stage 2 evaluation missing rubric labels or a parseable ranking.
+    """
+    if not profile:
+        return
+    rubric_dimensions = profile.get("rubric_dimensions", [])
+    rubric_labels = [dim["label"] for dim in rubric_dimensions]
+
+    async def _repair(item: Dict[str, Any]) -> None:
+        coverage = item.get("rubric_coverage", {})
+        missing = [
+            label for label, present in (coverage.get("present") or {}).items() if not present
+        ]
+        problems = []
+        if missing:
+            problems.append(f"missing rubric dimension labels: {', '.join(missing)}")
+        if not item.get("parsed_ranking"):
+            problems.append("missing a parseable FINAL RANKING section")
+        labels = "\n".join(f"- {label}" for label in rubric_labels)
+        prompt = f"""Your previous evaluation failed automated validation ({'; '.join(problems)}).
+
+Rewrite it so that:
+1. Every rubric dimension below appears VERBATIM as a labeled line or heading, each with a
+   0-10 score and one-sentence rationale per response:
+{labels}
+2. It ends with a "FINAL RANKING:" line followed by a numbered list of response labels only
+   (e.g. "1. Response A").
+
+Keep your substantive judgments. Output only the rewritten evaluation.
+
+Previous evaluation:
+{item.get('ranking', '')}
+"""
+        response, _err = await query_model_with_error(
+            item["model"],
+            [{"role": "user", "content": prompt}],
+        )
+        repaired_text = (response or {}).get("content") or ""
+        re_coverage = rubric_coverage_from_text(repaired_text, rubric_dimensions)
+        re_parsed = parse_ranking_from_text(repaired_text)
+        success = re_coverage["all_present"] and bool(re_parsed)
+        if success:
+            item["ranking"] = repaired_text
+            item["rubric_coverage"] = re_coverage
+            item["parsed_ranking"] = re_parsed
+            item["repaired"] = True
+        _record_repair_event(
+            run_context,
+            slot="stage2_ranking",
+            model=item["model"],
+            missing_before=missing,
+            success=success,
+        )
+
+    failing = [
+        item
+        for item in stage2_results
+        if not item.get("rubric_coverage", {}).get("all_present", True)
+        or not item.get("parsed_ranking")
+    ]
+    if failing:
+        await asyncio.gather(*[_repair(item) for item in failing])
+
+
 async def stage1_collect_responses(
     user_query: str,
     interrogation: Optional[Dict[str, Any]] = None,
@@ -957,9 +1135,14 @@ Role Card
 - Role: {assignment['role_name']} ({assignment['role_id']})
 - Mandate: {assignment['mandate']}
 
-Non-negotiable required sections in your answer (use these labels):
+Non-negotiable formatting contract — your answer MUST contain every one of these
+section labels VERBATIM as markdown headings (for example "## {assignment['must_include'][0]}"):
 {must_include}
 - Where I Disagree
+
+Automated validation checks for these exact labels. A prose-only answer without
+them is discarded, no matter how good the content is. Write your analysis inside
+the labeled sections.
 
 Profile Requirements
 - Profile: {profile.get('name', profile.get('id'))}
@@ -1041,6 +1224,8 @@ Output constraints:
             if response.get("model_used"):
                 item["model_used"] = response["model_used"]
             stage1_results.append(item)
+
+        await _repair_stage1_noncompliant(stage1_results, role_assignments, run_context)
         return stage1_results
 
     # Legacy path: same prompt for all models if no profile context provided.
@@ -1114,7 +1299,9 @@ async def stage2_collect_rankings(
             )
         rubric_block = (
             "Use the following profile rubric dimensions when evaluating each response. "
-            "For each response, include 0-10 scores and brief rationale for EVERY dimension:\n"
+            "For each response, include a 0-10 score and brief rationale for EVERY dimension, "
+            "and write each dimension label VERBATIM (automated validation checks for the "
+            "exact labels; evaluations missing any label are rejected):\n"
             + "\n".join(dim_lines)
             + "\n"
         )
@@ -1181,6 +1368,7 @@ Now provide your evaluation and ranking:"""
                 item["model_used"] = response["model_used"]
             stage2_results.append(item)
 
+    await _repair_stage2_noncompliant(stage2_results, profile, run_context)
     return stage2_results, label_to_model
 
 
@@ -1225,6 +1413,31 @@ async def stage3_synthesize_final(
     required_sections_text = "\n".join(f"- {section}" for section in required_sections)
     packet_context = format_research_packet_context(packet)
 
+    section_guidance = ""
+    if profile and profile.get("id") == "marketing":
+        if packet:
+            evidence_used_rule = (
+                "- Evidence Used: cite at least TWO specific research packet facts verbatim or "
+                "near-verbatim, each with its confidence label. List assumptions separately from "
+                "packet facts. If your recommendation violates or overrides any packet constraint, "
+                "state that explicitly and justify the override."
+            )
+        else:
+            evidence_used_rule = (
+                "- Evidence Used: no research packet was provided; say so, and list the "
+                "assumptions this decision rests on."
+            )
+        section_guidance = f"""
+This is a marketing decision. Your answer is a Decision Contract, not a strategy essay. Each required section must contain:
+- Decision: one clear choice. No "it depends" hedging. If the interrogation or council responses contain conflicting audience/ICP statements, pick ONE primary ICP for this decision and explicitly name the other as secondary or later; do not leave the conflict unresolved.
+- Hypothesis: what must be true for this decision to work.
+- Metric: the primary measure of success, with baseline (if known) and target.
+- First Experiment: the concrete first test - variant, audience, duration, and sample-size logic.
+- Kill Criteria: explicit stop/continue rules tied to the metric.
+{evidence_used_rule}
+- Risks: downside scenarios and failure modes.
+"""
+
     chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
 
 Original Question: {user_query}
@@ -1248,7 +1461,7 @@ Your task as Chairman is to synthesize all of this information into a single, co
 
 You MUST include these markdown sections with explicit headings:
 {required_sections_text}
-
+{section_guidance}
 For each claim, clearly separate validated facts from assumptions when uncertain.
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
 

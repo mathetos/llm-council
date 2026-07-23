@@ -6,6 +6,7 @@ import { api } from './api';
 
 const MODEL_PAIRING_STORAGE_KEY = 'llm-council:model-pairing-id';
 const ROLE_ASSIGNMENTS_STORAGE_KEY = 'llm-council:role-assignments-by-pairing';
+const ADVANCED_ROLE_ASSIGNMENTS_STORAGE_KEY = 'llm-council:advanced-role-assignments';
 const PRIVACY_SAFE_MODELS_CACHE_STORAGE_KEY = 'llm-council:privacy-safe-models-cache';
 const PRIVACY_SAFE_MODELS_CHECK_THROTTLE_MS = 2 * 60 * 1000;
 
@@ -26,6 +27,8 @@ function App() {
   const [selectedModelPairingId, setSelectedModelPairingId] = useState('premium');
   const [settingsProfileTabId, setSettingsProfileTabId] = useState('');
   const [roleAssignmentsByPairing, setRoleAssignmentsByPairing] = useState({});
+  const [smartDefaultsByPairing, setSmartDefaultsByPairing] = useState({});
+  const [advancedRoleAssignments, setAdvancedRoleAssignments] = useState(false);
   const [privacyModelOptionsState, setPrivacyModelOptionsState] = useState({
     isLoading: false,
     isCheckingUpdates: false,
@@ -236,21 +239,38 @@ function App() {
     return score;
   };
 
+  const getSmartDefaultRoleModels = (profileId, pairingId) => {
+    const defaults = smartDefaultsByPairing?.[pairingId]?.[profileId];
+    return { ...(defaults?.role_models || {}) };
+  };
+
   const buildAutoAssignments = (profileId, pairingId, existing = {}) => {
     const roleCards = pairingProfiles[profileId]?.perspective_roles || [];
+    const smartRoles = getSmartDefaultRoleModels(profileId, pairingId);
+    const next = { ...existing };
+
+    // Prefer curated smart defaults when seeding Advanced mode.
+    roleCards.forEach((role) => {
+      if (!next[role.id] && smartRoles[role.id]) {
+        next[role.id] = smartRoles[role.id];
+      }
+    });
+
     const councilModels = getAssignableModels();
-    if (!roleCards.length || !councilModels.length) {
-      return existing;
+    if (!roleCards.length) {
+      return next;
     }
 
     const modelMetaMap = Object.fromEntries(
       (privacyModelOptionsState.models || []).map((item) => [item.id, item])
     );
-    const next = { ...existing };
     const used = new Set(Object.values(next));
 
     roleCards.forEach((role) => {
-      if (next[role.id] && councilModels.includes(next[role.id])) {
+      if (next[role.id]) {
+        return;
+      }
+      if (!councilModels.length) {
         return;
       }
 
@@ -269,10 +289,21 @@ function App() {
     return next;
   };
 
+  const getDisplayRoleAssignments = (profileId = selectedProfileId) => {
+    if (advancedRoleAssignments) {
+      const key = getPairingKey(profileId, selectedModelPairingId);
+      const existing = roleAssignmentsByPairing[key] || {};
+      return buildAutoAssignments(profileId, selectedModelPairingId, existing);
+    }
+    return getSmartDefaultRoleModels(profileId, selectedModelPairingId);
+  };
+
+  /** Only send overrides when Advanced is on; otherwise backend smart defaults apply. */
   const getCurrentRoleAssignmentOverride = (profileId = selectedProfileId) => {
-    const key = getPairingKey(profileId, selectedModelPairingId);
-    const existing = roleAssignmentsByPairing[key] || {};
-    return buildAutoAssignments(profileId, selectedModelPairingId, existing);
+    if (!advancedRoleAssignments) {
+      return null;
+    }
+    return getDisplayRoleAssignments(profileId);
   };
 
   // Load conversations on mount
@@ -301,6 +332,7 @@ function App() {
         const settings = await api.listModelPairings();
         setModelPairings(settings.pairings || []);
         setPairingProfiles(settings.profiles || {});
+        setSmartDefaultsByPairing(settings.smart_defaults || {});
 
         const storedPairing = localStorage.getItem(MODEL_PAIRING_STORAGE_KEY);
         const defaultPairing = settings.default_model_pairing_id || 'premium';
@@ -310,6 +342,9 @@ function App() {
             ? storedPairing
             : defaultPairing;
         setSelectedModelPairingId(resolvedPairingId);
+
+        const savedAdvanced = localStorage.getItem(ADVANCED_ROLE_ASSIGNMENTS_STORAGE_KEY);
+        setAdvancedRoleAssignments(savedAdvanced === '1');
 
         const savedOverridesRaw = localStorage.getItem(
           ROLE_ASSIGNMENTS_STORAGE_KEY
@@ -410,15 +445,39 @@ function App() {
 
   const handleApplySmartDefaults = (profileId) => {
     const key = getPairingKey(profileId, selectedModelPairingId);
-    const smart = buildAutoAssignments(profileId, selectedModelPairingId, {});
+    const smart = getSmartDefaultRoleModels(profileId, selectedModelPairingId);
+    const seeded = Object.keys(smart).length
+      ? smart
+      : buildAutoAssignments(profileId, selectedModelPairingId, {});
     setRoleAssignmentsByPairing((prev) => {
       const next = {
         ...prev,
-        [key]: smart,
+        [key]: seeded,
       };
       localStorage.setItem(ROLE_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
+  };
+
+  const handleToggleAdvancedRoleAssignments = (enabled) => {
+    setAdvancedRoleAssignments(enabled);
+    localStorage.setItem(ADVANCED_ROLE_ASSIGNMENTS_STORAGE_KEY, enabled ? '1' : '0');
+    if (enabled) {
+      // Seed Advanced maps from smart defaults when empty.
+      const profileIds = Object.keys(pairingProfiles);
+      setRoleAssignmentsByPairing((prev) => {
+        const next = { ...prev };
+        profileIds.forEach((profileId) => {
+          const key = getPairingKey(profileId, selectedModelPairingId);
+          if (!next[key] || !Object.keys(next[key]).length) {
+            next[key] = getSmartDefaultRoleModels(profileId, selectedModelPairingId);
+          }
+        });
+        localStorage.setItem(ROLE_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+      checkForPrivacySafeModelUpdates();
+    }
   };
 
   const handleDeleteConversation = async (id) => {
@@ -494,6 +553,7 @@ function App() {
       }));
 
       // Send message with streaming
+      let sawTerminalEvent = false;
       await api.sendMessageStream(
         currentConversationId,
         content,
@@ -563,14 +623,20 @@ function App() {
               break;
 
             case 'complete':
+              sawTerminalEvent = true;
               // Stream complete, reload conversations list
               loadConversations();
               setIsLoading(false);
               break;
 
             case 'error':
+              sawTerminalEvent = true;
               console.error('Stream error:', event.message);
               setIsLoading(false);
+              break;
+
+            case 'heartbeat':
+              // Keep-alive during long Stage 2/3 waits; no UI change.
               break;
 
             default:
@@ -584,6 +650,24 @@ function App() {
         rerunContextOverride,
         abortController.signal
       );
+
+      // Dropped/idle streams can end without complete/error, leaving Stage 2 spinning forever.
+      if (!sawTerminalEvent) {
+        console.error('Council stream ended before completion');
+        setCurrentConversation((prev) => {
+          const messages = [...(prev?.messages || [])];
+          const last = messages[messages.length - 1];
+          if (last?.role === 'assistant' && last.loading) {
+            last.loading = { stage1: false, stage2: false, stage3: false };
+            if (!last.stage3) {
+              last.streamError =
+                'Connection dropped during the council run. Refresh and send again.';
+            }
+          }
+          return { ...prev, messages };
+        });
+        setIsLoading(false);
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
       if (error?.name === 'AbortError') {
@@ -767,11 +851,11 @@ function App() {
   const roleAssignmentsByProfile = Object.fromEntries(
     Object.keys(roleCardsByProfile).map((profileId) => [
       profileId,
-      getCurrentRoleAssignmentOverride(profileId),
+      getDisplayRoleAssignments(profileId),
     ])
   );
   const currentRoleAssignments = roleAssignmentsByProfile[activeSettingsProfileId] || {};
-  const selectedProfileRoleAssignments = roleAssignmentsByProfile[selectedProfileId] || {};
+  const selectedProfileRoleAssignments = getDisplayRoleAssignments(selectedProfileId);
   const duplicateRoleWarning = (() => {
     const reverse = {};
     Object.entries(currentRoleAssignments).forEach(([roleId, model]) => {
@@ -816,9 +900,12 @@ function App() {
         onSelectProfileTab={setSettingsProfileTabId}
         roleCardsByProfile={roleCardsByProfile}
         roleAssignmentsByProfile={roleAssignmentsByProfile}
-        duplicateRoleWarning={duplicateRoleWarning}
+        smartDefaultsByPairing={smartDefaultsByPairing}
+        duplicateRoleWarning={advancedRoleAssignments ? duplicateRoleWarning : ''}
         onChangeRoleAssignment={handleChangeRoleAssignment}
         onApplySmartDefaults={handleApplySmartDefaults}
+        advancedRoleAssignments={advancedRoleAssignments}
+        onToggleAdvancedRoleAssignments={handleToggleAdvancedRoleAssignments}
         modelOptionsState={privacyModelOptionsState}
         onRefreshModels={refreshPrivacySafeModels}
       />

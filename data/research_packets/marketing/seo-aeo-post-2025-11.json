@@ -1,0 +1,149 @@
+{
+  "packet_id": "seo-aeo-post-2025-11",
+  "profile_id": "marketing",
+  "title": "SEO/AEO practices since Nov 2025",
+  "as_of": "2026-07-23",
+  "summary": "Reusable decision-class brief for which SEO and AEO practices to treat as current (sources published or updated on/after 2025-11-01) when choosing content, on-page, and measurement bets for organic search and answer engines. Grounded primarily in Google Search Central generative-AI guidance (May–June 2026) plus OpenAI and Perplexity crawler docs, with medium-confidence 2026 citation studies covering authority lag and affirmative on-page practices. Paid channels appear only as time-boxed validation probes. Not for local SEO, deep ecommerce SEO, link-scheme playbooks, sustained CPC strategy, or brand creative systems.",
+  "facts": [
+    {
+      "statement": "Google states that generative AI features on Search (AI Overviews and AI Mode) are rooted in core Search ranking and quality systems, so foundational SEO practices remain the path to visibility in those features.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide"
+    },
+    {
+      "statement": "From Google Search’s perspective, optimizing for generative AI search is still SEO; Google treats third-party “AEO” and “GEO” labels as marketing terms rather than a separate Google discipline, and advises evaluating third-party AEO/GEO advice against official guidance.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide"
+    },
+    {
+      "statement": "To be eligible as a supporting link in AI Overviews or AI Mode, a page must be indexed and eligible to appear in Google Search with a snippet; Google documents no additional technical requirements for those features.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/appearance/ai-features"
+    },
+    {
+      "statement": "Google says you do not need llms.txt or other special AI text files, content “chunking” for AI, AI-only rewriting, inauthentic web mentions, or special schema.org markup to appear in Google Search generative AI features.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide"
+    },
+    {
+      "statement": "Google’s May 2026 generative AI optimization guidance prioritizes unique, non-commodity, people-first content with a distinctive point of view over commodity tip-list style pages that restate common knowledge.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide"
+    },
+    {
+      "statement": "AI Overviews and AI Mode may use query fan-out (concurrent related sub-queries); creating separate pages for every variation primarily to manipulate rankings or generative AI responses can violate Google’s scaled content abuse spam policy.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide"
+    },
+    {
+      "statement": "Search Console’s Search generative AI control (Settings → Search generative AI) can Include or Exclude a property from AI Overviews, AI Mode, and generative AI features in Discover; Google states the control is not a ranking signal for other parts of Search.",
+      "confidence": "high",
+      "source": "https://support.google.com/webmasters/answer/16908024?hl=en"
+    },
+    {
+      "statement": "Excluding a property via Search generative AI control prevents its links and content from appearing in those generative AI features and from being used as grounding input there, so the property receives no impressions or traffic from those features; changes generally take effect within about 1–2 days after the control is live.",
+      "confidence": "high",
+      "source": "https://support.google.com/webmasters/answer/16908024?hl=en"
+    },
+    {
+      "statement": "Google-Extended is a robots.txt product token for limiting use of crawled content in Gemini training and certain Gemini/Vertex grounding products; Google states it does not impact inclusion in Google Search and is not a Search ranking signal.",
+      "confidence": "high",
+      "source": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers"
+    },
+    {
+      "statement": "Google Search Console’s Generative AI performance report (rolling out) reports impressions for AI Overviews and AI Mode by page, country, device, and date, and that data is also included in overall Web Performance totals.",
+      "confidence": "high",
+      "source": "https://support.google.com/webmasters/answer/16984139?hl=en"
+    },
+    {
+      "statement": "OpenAI documents OAI-SearchBot as the control for surfacing sites in ChatGPT search answers, independent of GPTBot (training); sites opted out of OAI-SearchBot will not be shown in ChatGPT search answers, though they may still appear as navigational links.",
+      "confidence": "high",
+      "source": "https://developers.openai.com/api/docs/bots"
+    },
+    {
+      "statement": "OpenAI states ChatGPT referral URLs include utm_source=chatgpt.com, so analytics platforms can attribute inbound traffic from ChatGPT search when OAI-SearchBot is allowed.",
+      "confidence": "high",
+      "source": "https://help.openai.com/en/articles/12627856-publishers-and-developers-faq"
+    },
+    {
+      "statement": "Perplexity documents PerplexityBot as the crawler that surfaces and links sites in Perplexity search results (not for foundation-model training), and recommends allowing it in robots.txt plus published IP ranges because WAFs may otherwise block it.",
+      "confidence": "high",
+      "source": "https://docs.perplexity.ai/docs/resources/perplexity-crawlers"
+    },
+    {
+      "statement": "Perplexity-User fetches pages for user questions and generally ignores robots.txt; blocking PerplexityBot alone does not fully stop user-triggered fetches.",
+      "confidence": "high",
+      "source": "https://docs.perplexity.ai/docs/resources/perplexity-crawlers"
+    },
+    {
+      "statement": "2026 correlation studies across ChatGPT, Google AI Mode, and AI Overviews (Ahrefs 75K-brand study and follow-ups) find Domain Rating (r≈0.27–0.33) and backlink counts (r≈0.22) are weak predictors of AI citation, while off-site branded web mentions correlate roughly 3x more strongly (r≈0.66); mid/low-DR domains can earn citations, but AI visibility concentrates in brands with broad earned mentions, so expect an authority/brand-mention lag before citations appear on competitive terms.",
+      "confidence": "medium",
+      "source": "https://www.digitalapplied.com/blog/ai-search-citation-ranking-factors-2026-data-study"
+    },
+    {
+      "statement": "Ahrefs' 2026 study of 55.8M AI Overviews found commercial-intent pages (category, product, and lead-gen landing pages) are almost absent from AI Overview citations, while how-to and definitional formats dominate; for commercial head terms, citation visibility mostly routes through supporting informational assets rather than the money page itself.",
+      "confidence": "medium",
+      "source": "https://yositeup.com/en-us/blog/ahrefs-55m-ai-overviews-analysis-2026"
+    },
+    {
+      "statement": "Analysis of 1.2M ChatGPT citations (Growth Memo, 2026) found 44.2% of citations are extracted from the first 30% of a document; pages that state the direct answer up front (bottom-line-up-front) in the opening of each section are structurally advantaged for answer-engine citation.",
+      "confidence": "medium",
+      "source": "https://redot.global/blog/information-gain-content-strategy/"
+    },
+    {
+      "statement": "The same 1.2M-citation analysis found heavily cited content averages ~20.6% named-entity density versus 5–8% in standard text; commercial pages with specific named tools, brands, people, and verifiable first-hand numbers outperform generic filler copy for citation.",
+      "confidence": "medium",
+      "source": "https://redot.global/blog/information-gain-content-strategy/"
+    },
+    {
+      "statement": "A 2M-citation B2B study (Discovered Labs, data through March 2026) found prompt-content alignment — mirroring how buyers phrase questions to AI engines in headings, with self-contained direct answers in the first paragraphs — was the highest-ROI on-page lever, with a standardized effect roughly 3x larger than the next strongest page-level signal.",
+      "confidence": "medium",
+      "source": "https://discoveredlabs.com/research/what-drives-ai-citations"
+    }
+  ],
+  "assumptions": [
+    "For Google surfaces, “current” SEO/AEO practice means Google Search Central guidance published or updated on/after 2025-11-01, especially the May 2026 generative AI optimization guide and June 2026 Search Console generative AI reports/controls.",
+    "Non-Google answer engines (ChatGPT search, Perplexity) still reward crawl access plus clear, citable on-page answers even though Google says special AI formatting files are unnecessary for Google Search generative AI.",
+    "Classic organic eligibility (indexable, snippet-eligible, helpful content) remains a prerequisite for Google AI Overview / AI Mode supporting links; answer-engine citation without classic crawl/index health is unlikely on Google.",
+    "Vendor citation-lift studies that prescribe FAQ schema, fixed answer-capsule lengths, or llms.txt as required for Google generative AI are treated as contested relative to Google’s May 2026 mythbusting; vendor-study facts in this packet are labeled medium confidence, used as directional evidence only, and never override official Google guidance.",
+    "For mid/low-DR sites competing on commercial head terms, assume an authority lag: brand-mention building and supporting informational assets typically must compound for one or more quarters before answer-engine citations appear; near-term wins are more likely on long-tail and comparison queries.",
+    "Dedicated Generative AI performance reports and the Search generative AI control may be unavailable on some properties during rollout; absence of the UI is not proof of zero generative AI visibility.",
+    "Outside Google, proof of answer-engine visibility will often combine referral UTMs (for example ChatGPT), server logs for AI crawlers, and manual or tool-based prompt panels rather than Search Console alone."
+  ],
+  "constraints": [
+    "Do not recommend llms.txt, AI-only chunking, AI-only rewriting, or special schema as required practices for Google AI Overviews or AI Mode.",
+    "Do not treat disallowing Google-Extended as an opt-out from AI Overviews or AI Mode; use Search Console’s Search generative AI control (when available) or snippet/noindex controls per Google docs.",
+    "Do not recommend publishing scaled pages for every fan-out query variation as an AEO tactic; Google flags that pattern as scaled content abuse risk.",
+    "Do not conflate GPTBot (OpenAI training) with OAI-SearchBot (ChatGPT search visibility); decide each robots.txt rule independently.",
+    "Paid channels may be recommended only as short, time-boxed validation probes for messaging or conversion hypotheses; do not expand recommendations into a sustained CPC playbook — ongoing paid strategy belongs in another packet.",
+    "Keep recommendations out of local SEO, deep ecommerce feed/Merchant-only tactics, link schemes, and brand creative systems; those belong in other packets.",
+    "Prefer sources dated on/after 2025-11-01 for core facts; older guidance may only label retired practices and must not be presented as current high-confidence tactics."
+  ],
+  "open_questions": [
+    "Which audience and query set should this run optimize for first: classic organic SERPs, Google AI Overviews / AI Mode, ChatGPT search, Perplexity, or a defined mix?",
+    "What success metric and time horizon define a win for these bets: Generative AI impressions in Search Console, clicks/engagement from AI features, ChatGPT utm_source=chatgpt.com referrals, assisted conversions, or branded mention share in answer engines?",
+    "Which offer or page types on this site are non-commodity enough (unique POV, first-hand proof) to justify a content bet versus commodity tip-list pages?",
+    "What robots.txt and WAF policy is already in place for Googlebot, Google-Extended, OAI-SearchBot, GPTBot, and PerplexityBot, and which are intentional?",
+    "If Search Console Generative AI reports or the Search generative AI control are not yet available for this property, what interim measurement plan is acceptable?",
+    "What kill criteria end a content or on-page AEO experiment (for example no Generative AI impressions or answer-engine citations after N weeks on priority prompts)?",
+    "What hard constraints (compliance, crawl budget, publishing capacity, YMYL risk) bound feasible recommendations this quarter?"
+  ],
+  "references": [
+    "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide",
+    "https://developers.google.com/search/blog/2026/05/a-new-resource-for-optimizing",
+    "https://developers.google.com/search/docs/appearance/ai-features",
+    "https://support.google.com/webmasters/answer/16908024?hl=en",
+    "https://support.google.com/webmasters/answer/16984139?hl=en",
+    "https://developers.google.com/search/blog/2026/06/gen-ai-performance-reports",
+    "https://blog.google/products-and-platforms/products/search/new-controls-website-owners/",
+    "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+    "https://developers.openai.com/api/docs/bots",
+    "https://help.openai.com/en/articles/12627856-publishers-and-developers-faq",
+    "https://docs.perplexity.ai/docs/resources/perplexity-crawlers",
+    "https://www.digitalapplied.com/blog/ai-search-citation-ranking-factors-2026-data-study",
+    "https://yositeup.com/en-us/blog/ahrefs-55m-ai-overviews-analysis-2026",
+    "https://redot.global/blog/information-gain-content-strategy/",
+    "https://discoveredlabs.com/research/what-drives-ai-citations",
+    "Vault notes: data/research_packets/_sources/seo-aeo-post-2025-11/"
+  ]
+}

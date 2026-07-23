@@ -106,8 +106,9 @@ class OrchestrationParityTests(unittest.TestCase):
         stage3 = {
             "model": "m3",
             "response": (
-                "## Facts\nx\n## Assumptions\nx\n## Reconciliation\nx\n"
-                "## Risks\n- risk\n## Recommendation\nx"
+                "## Decision\nx\n## Hypothesis\nx\n## Metric\nx\n"
+                "## First Experiment\nx\n## Kill Criteria\nx\n"
+                "## Evidence Used\nx\n## Risks\n- risk"
             ),
             "section_validation": {"valid": True, "missing": []},
         }

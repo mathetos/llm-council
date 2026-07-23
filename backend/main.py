@@ -24,7 +24,9 @@ from .config import (
     get_profile,
     list_profiles,
     list_model_pairings,
+    list_all_smart_defaults,
     resolve_model_pairing,
+    apply_profile_smart_defaults_to_pairing,
 )
 from .council import (
     run_full_council,
@@ -36,6 +38,7 @@ from .council import (
     is_defer_answer,
     resolve_perspective_roles,
 )
+from .packet_questions import unresolved_packet_open_questions
 from .openrouter import (
     query_model_with_error,
     list_user_visible_models_with_error,
@@ -182,6 +185,17 @@ def _validate_role_assignment_override(
     if not profile:
         return
     resolve_perspective_roles(council_models, profile, role_assignments_override)
+
+
+def _profile_id_from_run_context(run_context: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Extract profile id from hydrated run_context."""
+    if not run_context:
+        return None
+    profile = run_context.get("profile")
+    if isinstance(profile, dict) and profile.get("id"):
+        return profile["id"]
+    profile_id = run_context.get("profile_id")
+    return profile_id if isinstance(profile_id, str) and profile_id else None
 
 
 async def _apply_free_auto_router_override_or_400(
@@ -759,6 +773,7 @@ async def get_model_pairing_settings():
         "default_model_pairing_id": DEFAULT_MODEL_PAIRING_ID,
         "pairings": pairings,
         "profiles": profiles,
+        "smart_defaults": list_all_smart_defaults(),
     }
 
 
@@ -1135,6 +1150,7 @@ async def start_interrogation(conversation_id: str, request: StartInterrogationR
         pairing,
         request.free_backup_models_override,
     )
+    pairing = apply_profile_smart_defaults_to_pairing(pairing, profile_id)
     runtime_pairing = await _resolve_runtime_pairing(pairing)
     interrogator_model = runtime_pairing["resolved"]["interrogator_model"]
 
@@ -1205,7 +1221,18 @@ async def start_interrogation(conversation_id: str, request: StartInterrogationR
 def _build_interrogation_payload(session: Dict[str, Any]) -> Dict[str, Any]:
     """Build the completed interrogation payload from session state."""
     steps = session["steps"]
+    packet = session.get("research_packet")
+    all_open_questions = [
+        oq for oq in ((packet or {}).get("open_questions") or []) if isinstance(oq, str) and oq.strip()
+    ]
+    unresolved = unresolved_packet_open_questions(packet, steps)
+    packet_open_questions = {
+        "total": len(all_open_questions),
+        "addressed": [oq for oq in all_open_questions if oq not in unresolved],
+        "unresolved": unresolved,
+    }
     return {
+        "packet_open_questions": packet_open_questions,
         "model": session["model"],
         "profile_id": session["profile_id"],
         "profile_name": session.get("profile_name"),
@@ -1270,6 +1297,7 @@ async def answer_interrogation(conversation_id: str, request: AnswerInterrogatio
         min_questions=session["min_questions"],
         max_questions=session["max_questions"],
         interrogator_model=session["model"],
+        research_packet=session.get("research_packet"),
     )
 
     session["coverage"] = assessment.get("coverage")
@@ -1378,26 +1406,33 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    is_first_message, interrogation, run_context = _resolve_message_context(conversation, request)
+    if run_context is None:
+        run_context = {}
+    profile_id = _profile_id_from_run_context(run_context) or DEFAULT_PROFILE_ID
+
     pairing = _resolve_pairing_or_400(request.model_pairing_id)
     pairing = await _apply_free_auto_router_override_or_400(
         pairing,
         request.free_backup_models_override,
     )
+    pairing = apply_profile_smart_defaults_to_pairing(pairing, profile_id)
     runtime_pairing = await _resolve_runtime_pairing(pairing)
-    is_first_message, interrogation, run_context = _resolve_message_context(conversation, request)
-    if run_context is None:
-        run_context = {}
     run_context["model_resolution"] = runtime_pairing
+
+    # Advanced: explicit role map. Default: ordered smart-default council_models
+    # (resolved/substituted) assigned to roles in profile card order.
+    role_override = request.role_assignments_override
     council_models_for_run = _merge_council_models_with_role_override(
         runtime_pairing["resolved"]["council_models"],
         run_context.get("profile"),
-        request.role_assignments_override,
+        role_override,
     )
     try:
         _validate_role_assignment_override(
             run_context,
             council_models_for_run,
-            request.role_assignments_override,
+            role_override,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1419,7 +1454,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
             council_models=council_models_for_run,
             chairman_model=runtime_pairing["resolved"]["chairman_model"],
             model_pairing_id=pairing["id"],
-            role_assignments_override=request.role_assignments_override,
+            role_assignments_override=role_override,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1454,26 +1489,31 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    is_first_message, interrogation, run_context = _resolve_message_context(conversation, request)
+    if run_context is None:
+        run_context = {}
+    profile_id = _profile_id_from_run_context(run_context) or DEFAULT_PROFILE_ID
+
     pairing = _resolve_pairing_or_400(request.model_pairing_id)
     pairing = await _apply_free_auto_router_override_or_400(
         pairing,
         request.free_backup_models_override,
     )
+    pairing = apply_profile_smart_defaults_to_pairing(pairing, profile_id)
     runtime_pairing = await _resolve_runtime_pairing(pairing)
-    is_first_message, interrogation, run_context = _resolve_message_context(conversation, request)
-    if run_context is None:
-        run_context = {}
     run_context["model_resolution"] = runtime_pairing
+
+    role_override = request.role_assignments_override
     council_models_for_run = _merge_council_models_with_role_override(
         runtime_pairing["resolved"]["council_models"],
         run_context.get("profile"),
-        request.role_assignments_override,
+        role_override,
     )
     try:
         _validate_role_assignment_override(
             run_context,
             council_models_for_run,
-            request.role_assignments_override,
+            role_override,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1502,17 +1542,25 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     council_models=council_models_for_run,
                     chairman_model=runtime_pairing["resolved"]["chairman_model"],
                     model_pairing_id=pairing["id"],
-                    role_assignments_override=request.role_assignments_override,
+                    role_assignments_override=role_override,
                 )
             )
 
+            # Stage 2/3 can be silent for 60–120s; emit heartbeats so the SSE
+            # connection is not treated as idle and dropped mid-run.
+            last_heartbeat = time.monotonic()
             while True:
                 if run_task.done() and event_queue.empty():
                     break
                 try:
                     event = await asyncio.wait_for(event_queue.get(), timeout=0.05)
                 except asyncio.TimeoutError:
+                    now = time.monotonic()
+                    if now - last_heartbeat >= 15:
+                        last_heartbeat = now
+                        yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
                     continue
+                last_heartbeat = time.monotonic()
                 yield f"data: {json.dumps(event)}\n\n"
 
             stage1_results, stage2_results, stage3_result, metadata = await run_task

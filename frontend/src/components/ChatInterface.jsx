@@ -411,6 +411,11 @@ export default function ChatInterface({
                       <span>Running Stage 2: Peer rankings...</span>
                     </div>
                   )}
+                  {msg.streamError && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {msg.streamError}
+                    </div>
+                  )}
                   {msg.stage2 && (
                     <Stage2
                       rankings={msg.stage2}

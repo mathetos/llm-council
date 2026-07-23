@@ -25,6 +25,20 @@ class ConfigProfileContractTests(unittest.TestCase):
             self.assertTrue(profile["perspective_roles"])
             self.assertTrue(profile["stage3_required_sections"])
 
+    def test_marketing_stage3_uses_decision_contract(self):
+        self.assertEqual(
+            get_profile("marketing")["stage3_required_sections"],
+            [
+                "Decision",
+                "Hypothesis",
+                "Metric",
+                "First Experiment",
+                "Kill Criteria",
+                "Evidence Used",
+                "Risks",
+            ],
+        )
+
     def test_get_profile_rejects_unknown(self):
         with self.assertRaises(ValueError):
             get_profile("does_not_exist")
@@ -100,6 +114,169 @@ class ProfileGuardrailsApiTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 400)
         self.assertIn("not found", res.json()["detail"].lower())
+
+
+class ConversionOperatorBaselineLockTests(unittest.TestCase):
+    """
+    Lock the run-d500e977 failure mode: gpt-4o-mini as Conversion Operator
+    produced a prose-only Stage 1 answer (missing all required section labels)
+    and a Stage 2 ranking without rubric labels, causing 0.75/0.75 guardrail
+    degradation. Synthetic texts reproduce the exact missing lists.
+    """
+
+    CONVERSION_OPERATOR_MUST_INCLUDE = [
+        "Execution Plan",
+        "Experiment Design",
+        "Resource Assumptions",
+    ]
+
+    # Prose-only answer in the style that failed: helpful content, no headings.
+    PROSE_ONLY_STAGE1 = (
+        "The fastest path is to publish the pricing table first and drive a "
+        "small paid test toward the booking form. Start with the comparison "
+        "asset, then measure booked calls weekly and adjust copy. The team "
+        "should sequence the audit before the page launch."
+    )
+
+    # Ranking that discusses quality but names only one rubric label.
+    RANKING_MISSING_RUBRIC = (
+        "Response A is thorough and practical. Response B is weaker on "
+        "sequencing. On Execution Feasibility, Response A wins clearly.\n\n"
+        "FINAL RANKING:\n1. Response A\n2. Response B"
+    )
+
+    def test_stage1_prose_only_fails_exactly_the_observed_sections(self):
+        validation = council.validate_required_sections(
+            self.PROSE_ONLY_STAGE1,
+            self.CONVERSION_OPERATOR_MUST_INCLUDE + ["Where I Disagree"],
+        )
+        self.assertFalse(validation["valid"])
+        self.assertEqual(
+            validation["missing"],
+            [
+                "Execution Plan",
+                "Experiment Design",
+                "Resource Assumptions",
+                "Where I Disagree",
+            ],
+        )
+
+    def test_stage1_with_exact_labels_passes(self):
+        compliant = (
+            "Execution Plan: publish pricing table first.\n"
+            "Experiment Design: paid probe to booking form.\n"
+            "Resource Assumptions: 2.5 marketers.\n"
+            "Where I Disagree: organic-first is too slow here."
+        )
+        validation = council.validate_required_sections(
+            compliant,
+            self.CONVERSION_OPERATOR_MUST_INCLUDE + ["Where I Disagree"],
+        )
+        self.assertTrue(validation["valid"])
+        self.assertEqual(validation["missing"], [])
+
+    def test_stage2_ranking_misses_exactly_four_marketing_rubric_labels(self):
+        rubric = get_profile("marketing")["rubric_dimensions"]
+        coverage = council.rubric_coverage_from_text(
+            self.RANKING_MISSING_RUBRIC, rubric
+        )
+        self.assertFalse(coverage["all_present"])
+        missing = [label for label, present in coverage["present"].items() if not present]
+        self.assertEqual(
+            missing,
+            [
+                "Strategic Clarity",
+                "Message Resonance",
+                "Differentiation Strength",
+                "Testability",
+            ],
+        )
+        self.assertTrue(coverage["present"]["Execution Feasibility"])
+
+    def test_single_model_failure_yields_075_ratios_and_degraded(self):
+        """One bad model out of four produces the observed 0.75 / 0.75 degradation."""
+        diagnostics = {
+            "role_schema_compliance": {"valid": 3, "total": 4},
+            "rubric_coverage": {"all_present_count": 3, "total": 4},
+            "stage3_required_sections_valid": True,
+            "recommendation_overlap_score": 0.4,
+            "unique_risk_count": 6,
+        }
+        status = council.evaluate_guardrails(
+            diagnostics,
+            thresholds={
+                "role_schema_min_ratio": 1.0,
+                "rubric_coverage_min_ratio": 1.0,
+                "max_recommendation_overlap": 0.8,
+                "min_unique_risk_count": 1,
+            },
+            enforcement_mode="degraded",
+        )
+        self.assertEqual(status["status"], "degraded")
+        self.assertEqual(
+            status["violations"],
+            [
+                "Role schema compliance ratio 0.75 below 1.00",
+                "Rubric coverage ratio 0.75 below 1.00",
+            ],
+        )
+
+
+class ChairmanDecisionContractPromptTests(unittest.IsolatedAsyncioTestCase):
+    """Phase 4: marketing chairman prompt must force ICP choice, evidence floor, override disclosure."""
+
+    STAGE1 = [{"model": "m1", "response": "r1"}]
+    STAGE2 = [{"model": "m1", "ranking": "FINAL RANKING:\n1. Response A"}]
+
+    async def _capture_prompt(self, run_context):
+        capture = {}
+
+        async def fake_query(model, messages, timeout=None):
+            capture["prompt"] = messages[0]["content"]
+            return {"content": "## Decision\nx"}, None
+
+        with patch("backend.council.query_model_with_error", new=fake_query):
+            await council.stage3_synthesize_final(
+                "Should we target SMB or 6M+ pageview publishers?",
+                self.STAGE1,
+                self.STAGE2,
+                run_context=run_context,
+                chairman_model="test/chairman",
+            )
+        return capture["prompt"]
+
+    async def test_marketing_with_packet_includes_icp_and_evidence_floor(self):
+        run_context = {
+            "profile": get_profile("marketing"),
+            "research_packet": {
+                "packet_id": "p1",
+                "title": "Packet",
+                "as_of": "2026-07-01",
+                "summary": "s",
+                "facts": [{"statement": "Fact one", "confidence": "high"}],
+                "assumptions": ["A"],
+                "constraints": ["No paid expansion"],
+                "open_questions": [],
+                "references": [],
+            },
+        }
+        prompt = await self._capture_prompt(run_context)
+        self.assertIn("pick ONE primary ICP", prompt)
+        self.assertIn("secondary or later", prompt)
+        self.assertIn("at least TWO specific research packet facts", prompt)
+        self.assertIn("confidence label", prompt)
+        self.assertIn("violates or overrides any packet constraint", prompt)
+
+    async def test_marketing_without_packet_waives_evidence_floor_explicitly(self):
+        prompt = await self._capture_prompt({"profile": get_profile("marketing")})
+        self.assertIn("pick ONE primary ICP", prompt)
+        self.assertNotIn("at least TWO specific research packet facts", prompt)
+        self.assertIn("no research packet was provided", prompt)
+
+    async def test_non_marketing_profile_gets_no_decision_contract_guidance(self):
+        prompt = await self._capture_prompt({"profile": get_profile("product_development")})
+        self.assertNotIn("Decision Contract", prompt)
+        self.assertNotIn("pick ONE primary ICP", prompt)
 
 
 class GuardrailEvaluationTests(unittest.TestCase):
@@ -224,8 +401,9 @@ class GuardrailMetadataIntegrationTests(unittest.IsolatedAsyncioTestCase):
         stage3 = {
             "model": "m1",
             "response": (
-                "## Facts\nx\n## Assumptions\nx\n## Reconciliation\nx\n"
-                "## Risks\n- risk a\n## Recommendation\nx"
+                "## Decision\nx\n## Hypothesis\nx\n## Metric\nx\n"
+                "## First Experiment\nx\n## Kill Criteria\nx\n"
+                "## Evidence Used\nx\n## Risks\n- risk a"
             ),
             "section_validation": {"valid": True, "missing": []},
         }

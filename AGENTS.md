@@ -15,6 +15,7 @@ LLM Council is a deliberation system where multiple LLMs collaboratively answer 
 - `COUNCIL_MODELS` — list of OpenRouter model identifiers (must match [openrouter.ai/models](https://openrouter.ai/models) exactly)
 - `CHAIRMAN_MODEL` — model for Stage 3 synthesis (defaults to a slug shared with title generation so a bad preview id does not silently break only Stage 3)
 - `INTERROGATOR_MODEL` — Stage 0 model for adaptive clarification (defaults to `CHAIRMAN_MODEL` when unset)
+- `PAIRING_PROFILE_SMART_DEFAULTS` — curated Interrogator / council role / Chairman models per pairing (`premium` / `free_auto_router`) and profile; applied when the client does not send Advanced role overrides. Settings UI keeps role pickers behind Advanced.
 - `INTERROGATOR_MIN_QUESTIONS` / `INTERROGATOR_MAX_QUESTIONS` — bounded Stage 0 question count (defaults: 2 / 5, validated in config)
 - `INTERROGATOR_COVERAGE_SUFFICIENT` — fraction of required context fields that must be covered to skip the confirmation summary (default: 0.8)
 - `COUNCIL_PROFILES` — profile guardrail contracts (marketing / product_development / business_development)
@@ -31,9 +32,13 @@ LLM Council is a deliberation system where multiple LLMs collaboratively answer 
 - Returns dict with `content` and optional `reasoning_details`
 - Graceful degradation: returns `None` on failure, continues with successful responses
 
+**`packet_questions.py`**
+
+- Pure helpers (no I/O, no LLM): `unresolved_packet_open_questions(packet, steps)` and `packet_open_question_was_addressed(question_text, open_question)` — deterministic token-overlap rule (≥2 shared content tokens covering ≥35% of the open question's tokens) used to track which research-packet `open_questions` the interrogation has addressed
+
 **`council.py`** (core logic)
 
-- `generate_interrogator_question()` / `should_continue_interrogation()` / `summarize_interrogation()` — Stage 0 interrogator loop helpers
+- `generate_interrogator_question()` / `should_continue_interrogation()` / `summarize_interrogation()` — Stage 0 interrogator loop helpers; question and coverage prompts inject unresolved packet open questions as the highest-priority targets
 - `stage1_collect_responses()` — parallel queries to all council models (includes Stage 0 context when present)
 - `stage2_collect_rankings()`:
   - Anonymizes responses as "Response A, B, C, …"
@@ -41,6 +46,7 @@ LLM Council is a deliberation system where multiple LLMs collaboratively answer 
   - Prompts models to evaluate and rank (strict format)
   - Returns `(rankings_list, label_to_model_dict)`; each ranking has raw text and `parsed_ranking`
 - `stage3_synthesize_final()` — chairman synthesizes from all responses + rankings
+- Compliance repair: `_repair_stage1_noncompliant()` / `_repair_stage2_noncompliant()` — at most ONE repair retry per model per stage when Stage 1 misses required section labels or Stage 2 misses rubric labels / a parseable ranking; original output is kept if the repair fails; attempts are recorded as `repair_events` in metadata (next to `fallback_events`)
 - `parse_ranking_from_text()` — extracts `FINAL RANKING:` section; numbered lists and plain format
 - `calculate_aggregate_rankings()` — average rank position across peer evaluations
 - `run_full_council()` — canonical Stage 1→2→3 orchestration used by both sync and stream endpoints; optionally emits progress events via callback while preserving one metadata/guardrail code path
@@ -113,6 +119,7 @@ Enables reliable parsing while keeping useful evaluations.
 - **Confirmation summary**: when interrogation ends with low coverage, the user sees a summary with identified gaps and can choose to proceed or provide more context
 - Transcript, summary, and coverage assessment are injected into Stage 1 prompt context (including gap callouts) and persisted with the assistant message
 - Uses selected profile + research packet to prioritize clarification questions
+- **Packet open-question mandate**: unresolved packet `open_questions` (tracked via `packet_questions.py`) are injected into interrogator prompts as highest-priority targets; the completed interrogation payload records `packet_open_questions` (`total` / `addressed` / `unresolved`), and unresolved ones are called out in Stage 1 context so council members state their assumptions
 
 ### Profile guardrails and packets
 
@@ -121,6 +128,9 @@ Enables reliable parsing while keeping useful evaluations.
   - perspective role cards for Stage 1
   - rubric dimensions for Stage 2
   - required section headings for Stage 3
+- Stage 3 section contracts differ by profile:
+  - `marketing` uses a **Decision Contract**: Decision, Hypothesis, Metric, First Experiment, Kill Criteria, Evidence Used, Risks. The chairman prompt injects per-section guidance for this profile: Decision must pick ONE primary ICP when audience statements conflict; Evidence Used must cite ≥2 packet facts with confidence labels when a packet is present (explicitly waived when absent) and disclose any packet-constraint override
+  - `product_development` and `business_development` keep the generic shape: Facts, Assumptions, Reconciliation, Risks, Recommendation
 - Local packet contributes:
   - facts with confidence labels
   - assumptions and constraints

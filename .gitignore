@@ -27,6 +27,9 @@ data/eval_runs/
 !data/research_packets/
 !data/research_packets/**
 
+# Product/client-specific packets stay local (never ship to the public repo)
+data/research_packets/marketing/beta-campaign-landing-page.json
+
 # Local/dev caches and one-off artifacts
 .pytest_cache/
 temp/

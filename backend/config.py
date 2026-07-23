@@ -120,11 +120,13 @@ def _build_council_profiles() -> Dict[str, Dict[str, Any]]:
                 },
             ],
             "stage3_required_sections": [
-                "Facts",
-                "Assumptions",
-                "Reconciliation",
+                "Decision",
+                "Hypothesis",
+                "Metric",
+                "First Experiment",
+                "Kill Criteria",
+                "Evidence Used",
                 "Risks",
-                "Recommendation",
             ],
         },
         "product_development": {
@@ -339,25 +341,95 @@ MODEL_PAIRINGS: Dict[str, Dict[str, Any]] = {
     "premium": {
         "id": "premium",
         "label": "Premium",
-        "description": "Best overall quality with paid frontier models.",
+        "description": "Paid smart defaults per profile (Interrogator, council roles, Chairman).",
         "council_models": COUNCIL_MODELS,
         "chairman_model": CHAIRMAN_MODEL,
         "interrogator_model": CHAIRMAN_MODEL,
     },
     "free_auto_router": {
         "id": "free_auto_router",
-        "label": "Free (Auto Router)",
-        "description": "Use OpenRouter free router with diverse free backups.",
+        "label": "Free",
+        "description": "Free smart defaults per profile. Named free models only (no openrouter/free on Stage 0/3).",
         "council_models": [
-            "openrouter/free",
-            "google/gemma-3-27b-it:free",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
             "nvidia/nemotron-3-nano-30b-a3b:free",
+            "openai/gpt-oss-20b:free",
         ],
-        "chairman_model": "openrouter/free",
-        "interrogator_model": "openrouter/free",
+        "chairman_model": "google/gemma-4-31b-it:free",
+        "interrogator_model": "google/gemma-4-31b-it:free",
     },
 }
 DEFAULT_MODEL_PAIRING_ID = "premium"
+
+# Curated defaults: pairing -> profile -> interrogator/chairman + role_id -> model.
+# Used when the user is not in Advanced role-assignment mode.
+PAIRING_PROFILE_SMART_DEFAULTS: Dict[str, Dict[str, Dict[str, Any]]] = {
+    "premium": {
+        "marketing": {
+            "interrogator_model": CHAIRMAN_MODEL,
+            "chairman_model": CHAIRMAN_MODEL,
+            "role_models": {
+                "systems_thinker": "anthropic/claude-sonnet-4.6",
+                "conversion_operator": "openai/gpt-4o-mini",
+                "audience_psychologist": "google/gemini-2.5-flash",
+                "skeptic_auditor": "openai/gpt-4o",
+            },
+        },
+        "product_development": {
+            "interrogator_model": CHAIRMAN_MODEL,
+            "chairman_model": "anthropic/claude-sonnet-4.6",
+            "role_models": {
+                "pm_strategist": "anthropic/claude-sonnet-4.6",
+                "staff_engineer": "openai/gpt-4o",
+                "adoption_analyst": "openai/gpt-4o-mini",
+                "failure_mode_reviewer": "google/gemini-2.5-flash",
+            },
+        },
+        "business_development": {
+            "interrogator_model": CHAIRMAN_MODEL,
+            "chairman_model": CHAIRMAN_MODEL,
+            "role_models": {
+                "market_mapper": "anthropic/claude-sonnet-4.6",
+                "deal_operator": "openai/gpt-4o-mini",
+                "objection_strategist": "google/gemini-2.5-flash",
+                "commercial_risk_auditor": "openai/gpt-4o",
+            },
+        },
+    },
+    "free_auto_router": {
+        "marketing": {
+            "interrogator_model": "google/gemma-4-31b-it:free",
+            "chairman_model": "google/gemma-4-31b-it:free",
+            "role_models": {
+                "systems_thinker": "nvidia/nemotron-3-nano-30b-a3b:free",
+                "conversion_operator": "google/gemma-4-26b-a4b-it:free",
+                "audience_psychologist": "google/gemma-4-31b-it:free",
+                "skeptic_auditor": "openai/gpt-oss-20b:free",
+            },
+        },
+        "product_development": {
+            "interrogator_model": "google/gemma-4-31b-it:free",
+            "chairman_model": "openai/gpt-oss-20b:free",
+            "role_models": {
+                "pm_strategist": "google/gemma-4-31b-it:free",
+                "staff_engineer": "openai/gpt-oss-20b:free",
+                "adoption_analyst": "google/gemma-4-26b-a4b-it:free",
+                "failure_mode_reviewer": "nvidia/nemotron-3-nano-30b-a3b:free",
+            },
+        },
+        "business_development": {
+            "interrogator_model": "google/gemma-4-31b-it:free",
+            "chairman_model": "google/gemma-4-31b-it:free",
+            "role_models": {
+                "market_mapper": "nvidia/nemotron-3-nano-30b-a3b:free",
+                "deal_operator": "google/gemma-4-26b-a4b-it:free",
+                "objection_strategist": "google/gemma-4-31b-it:free",
+                "commercial_risk_auditor": "openai/gpt-oss-20b:free",
+            },
+        },
+    },
+}
 
 COUNCIL_PROFILES = _build_council_profiles()
 _validate_profiles(COUNCIL_PROFILES)
@@ -498,3 +570,63 @@ def resolve_model_pairing(pairing_id: str | None) -> Dict[str, Any]:
     """Resolve selected pairing or fall back to default pairing."""
     resolved_id = (pairing_id or DEFAULT_MODEL_PAIRING_ID).strip() or DEFAULT_MODEL_PAIRING_ID
     return get_model_pairing(resolved_id)
+
+
+def get_pairing_profile_smart_defaults(
+    pairing_id: str,
+    profile_id: str,
+) -> Dict[str, Any]:
+    """
+    Return curated smart defaults for a pairing + profile.
+
+    Shape: { interrogator_model, chairman_model, role_models: { role_id: model } }
+    """
+    by_profile = PAIRING_PROFILE_SMART_DEFAULTS.get(pairing_id) or {}
+    defaults = by_profile.get(profile_id)
+    if not defaults:
+        return {}
+    return {
+        "interrogator_model": defaults["interrogator_model"],
+        "chairman_model": defaults["chairman_model"],
+        "role_models": dict(defaults.get("role_models") or {}),
+    }
+
+
+def apply_profile_smart_defaults_to_pairing(
+    pairing: Dict[str, Any],
+    profile_id: str,
+) -> Dict[str, Any]:
+    """
+    Return a pairing copy with interrogator/chairman/council_models from smart defaults.
+
+    Council models are ordered by the profile's perspective role cards.
+    """
+    defaults = get_pairing_profile_smart_defaults(pairing["id"], profile_id)
+    if not defaults:
+        return pairing
+
+    updated = dict(pairing)
+    updated["interrogator_model"] = defaults["interrogator_model"]
+    updated["chairman_model"] = defaults["chairman_model"]
+
+    profile = get_profile(profile_id)
+    role_models = defaults.get("role_models") or {}
+    ordered: List[str] = []
+    for role in profile.get("perspective_roles") or []:
+        model = role_models.get(role.get("id"))
+        if model and model not in ordered:
+            ordered.append(model)
+    if ordered:
+        updated["council_models"] = ordered
+    return updated
+
+
+def list_all_smart_defaults() -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """Expose smart defaults for Settings UI (pairing -> profile -> defaults)."""
+    return {
+        pairing_id: {
+            profile_id: get_pairing_profile_smart_defaults(pairing_id, profile_id)
+            for profile_id in profiles.keys()
+        }
+        for pairing_id, profiles in PAIRING_PROFILE_SMART_DEFAULTS.items()
+    }
